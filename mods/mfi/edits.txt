@@ -1,0 +1,5 @@
+# 9106 = MFi PADDLES for Android/HID mode (3537:0112), based on stock 8900.
+# Report unchanged (15 bytes). Stick copy rewritten as an equal loop; freed space ORs the raw key word [0x5BC0+1472]:
+#   bit 23 (left paddle, from other-half chip) -> HID button 3 (report btn bit 2)
+#   bit 24 (right paddle, PR1 pin)            -> HID button 6 (report btn bit 5)
+1cb46:4884898110870207920741e080611160d8e90a2093b763e1013033a2321993b863e1013033a53219d8e90b2000000000   # see paddles.s; 2 nops pad to 1cb76

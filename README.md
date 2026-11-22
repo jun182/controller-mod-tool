@@ -1,7 +1,8 @@
 # controller-mod-tool (beta)
 
-Unofficial tool to add mods to game controller firmware. First supported controller: **GameSir G8+ (Bluetooth
-version)**, firmware 2.20. Terminal app for Linux, used with the arrow keys, Enter and Esc.
+Unofficial tool to add mods to game controller firmware. Supported controllers: **GameSir G8+ (Bluetooth
+version)**, firmware 2.20, and **GameSir G8+ MFi (wired)**, firmware 8900 (build-only, see below). Pick the controller
+type in the top row of the app. Terminal app for Linux, used with the arrow keys, Enter and Esc.
 
 > [!CAUTION]
 > **USE AT YOUR OWN RISK. NO WARRANTY. WE ARE NOT RESPONSIBLE FOR ANY DAMAGE.**
@@ -37,6 +38,21 @@ Faster input speed makes the Bluetooth radio work more often, so it probably use
 It can also disturb DS4 mode if your phone is paired with the controller in both modes. Combinations without the
 back-button mod have not been tested on a controller yet; the app warns about them.
 
+### G8+ MFi (wired, Android/HID mode): build-only
+
+The app builds `G8-Plus-MFi-firmware-99xx.zip` from GameSir's **official firmware 8900**; you copy it to your phone
+and flash it with the GameSir phone app ("local file"). The app does not flash the MFi itself. With the controller
+plugged into the laptop it shows the USB mode and, for builds made by this app, which mods are installed (read from
+what Linux already knows about the device; nothing is sent to the controller).
+
+| Mod | Options | Status |
+|---|---|---|
+| Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
+| Home button | stock (held back ~0.8 s, Home + D-pad = volume) / instant (volume shortcut removed) | tested together with independent back buttons |
+
+Files from this app also carry a one-byte build marker in the controller's descriptor (the same idea already works on
+the Bluetooth model). No marked MFi build has run on a controller yet: check the buttons after flashing.
+
 ## What it does NOT include
 
 **No GameSir firmware is included or distributed here**, only our own code and small edit files (lists of
@@ -47,7 +63,8 @@ back-button mod have not been tested on a controller yet; the app warns about th
 3. only if you choose so in the app: it downloads it from GameSir's own update server and saves it to `firmware/`.
 
 Whatever the source, the app only applies mods to a file that is byte-identical to the official 2.20
-(sha256 `8e5d2d0c49eecbc9e9bad78adf11e9e43a501c088693c9fdd4eea46978768160`).
+(sha256 `8e5d2d0c49eecbc9e9bad78adf11e9e43a501c088693c9fdd4eea46978768160`). For the MFi the same applies to
+`G8-Plus-MFi-firmware-8900.zip` (ota.bin sha256 `3c35f03453e97eedcc0e47bc59423f8c4c27d242e651918114737a98c0774fc5`).
 
 ## Updates
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """GameSir G8+ mod tool (terminal UI). Arrow keys, Enter and Esc only.
 
-First model of a general controller mod app: the UI is meant to become generic, with connection, flashing and the
-mod list per model. Most planned models are USB (G8+ MFi, X5 Lite); Bluetooth LE here is specific to the G8+ BT.
+Start of a general controller mod app: the top row picks the controller type (Left/Right, or Enter for a list); it
+starts on the G8+ MFi if one is plugged in over USB, else on the G8+ Bluetooth. Per model: base firmware, mod list,
+build, and whether this app can flash it. G8+ Bluetooth: build + flash over Bluetooth LE (below). G8+ MFi
+(model_mfi.py): build-only, the user flashes the saved zip with the GameSir phone app; the USB status and installed
+mods are read from sysfs (the descriptor the kernel already has), nothing is sent to the controller.
 
 What it does, step by step and visibly:
   base firmware  official GameSir 2.20: a file next to this script or in its firmware/ folder, a file you pick,
@@ -34,6 +37,7 @@ import sys
 import textwrap
 import threading
 import time
+import types
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -44,6 +48,7 @@ sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(CR))
 import g8fw  # noqa: E402
 import g8ota  # noqa: E402
+import model_mfi  # noqa: E402
 
 CACHE = Path.home() / ".cache/g8tui"     # built images (temporary)
 FW_DIR = TOOLS / "firmware"               # where GameSir firmware files go (git-ignored)
@@ -111,6 +116,11 @@ ACTIONS = {  # name -> one-line description of what happens, shown under the foc
     "Check for updates": "ask GitHub for the newest release and tell you (downloads and installs nothing)",
     "Quit": "",
 }
+ACTIONS_MFI = {  # descriptions that differ for the MFi (wired, build-only)
+    "Read controller again": "look at the USB connection again and read which mods it has (sends nothing to it)",
+    "Save modded firmware to a file": "check base firmware -> apply mods -> build image -> save a .zip for the phone "
+                                      "app (no flashing)",
+}
 
 
 def short_path(p: Path) -> str:
@@ -131,10 +141,10 @@ def run(cmd: list[str], timeout: float = 10) -> str:
 
 # -- mods <-> mask ----------------------------------------------------------------------------------------------
 
-def levels_of(mask: int) -> list[int]:
+def levels_of(mask: int, features=None) -> list[int]:
     """Mask -> chosen level per mod (highest level whose bits are all set)."""
     out = []
-    for _title, _slider, levels in FEATURES:
+    for _title, _slider, levels in features or FEATURES:
         lvl = 0
         for i, level in enumerate(levels):
             if level[0] and level[0] & mask == level[0]:
@@ -143,15 +153,16 @@ def levels_of(mask: int) -> list[int]:
     return out
 
 
-def mask_of(levels: list[int]) -> int:
+def mask_of(levels: list[int], features=None) -> int:
     m = 0
-    for (_title, _slider, lv), i in zip(FEATURES, levels):
+    for (_title, _slider, lv), i in zip(features or FEATURES, levels):
         m |= lv[i][0]
     return m
 
 
-def mods_text(mask: int) -> list[str]:
-    return [levels[lvl][1] for (_t, _s, levels), lvl in zip(FEATURES, levels_of(mask))]
+def mods_text(mask: int, features=None) -> list[str]:
+    features = features or FEATURES
+    return [levels[lvl][1] for (_t, _s, levels), lvl in zip(features, levels_of(mask, features))]
 
 
 def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
@@ -211,24 +222,27 @@ def describe_image(enc: bytes) -> tuple[bool, str, int | None]:
     return True, desc, mask
 
 
-def find_local_firmware() -> list[Path]:
-    """Official 2.20 files next to this script, in its firmware/ folder, or in the current folder."""
+def find_local_firmware(model=None) -> list[Path]:
+    """Official base firmware files (2.20 for the BT model) next to this script, in its firmware/ folder, or in the
+    current folder."""
+    stock = model.is_stock if model else is_stock
     found = []
     for d in dict.fromkeys([TOOLS, FW_DIR, Path.cwd()]):
         if not d.is_dir():
             continue
         for p in sorted(d.glob("*.zip")) + sorted(d.glob("*.bin")):
             try:
-                if p.stat().st_size < 2_000_000 and is_stock(read_image(p)):
+                if p.stat().st_size < 2_000_000 and stock(read_image(p)):
                     found.append(p)
             except (OSError, ValueError, zipfile.BadZipFile):
                 pass
     return found
 
 
-def download_stock() -> Path:
-    """Official 2.20 from GameSir's update server, checked and saved to FW_DIR. Returns the saved path."""
-    req = urllib.request.Request(STOCK_URL, headers={"User-Agent": "g8tui"})
+def download_stock(model=None) -> Path:
+    """Official base firmware from GameSir's update server, checked and saved to FW_DIR. Returns the saved path."""
+    model = model or BT
+    req = urllib.request.Request(model.stock_url, headers={"User-Agent": "g8tui"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = resp.read(MAX_FILE + 1)
     if len(data) > MAX_FILE:
@@ -238,10 +252,10 @@ def download_stock() -> Path:
         if info.file_size > MAX_FILE:
             raise ValueError("ota.bin in the download is too big")
         enc = z.read(info)
-    if not is_stock(enc):
-        raise ValueError("the downloaded file is not the expected official 2.20 (GameSir changed it?)")
+    if not model.is_stock(enc):
+        raise ValueError(f"the downloaded file is not the expected official {model.base} (GameSir changed it?)")
     FW_DIR.mkdir(parents=True, exist_ok=True)
-    out = FW_DIR / STOCK_NAME
+    out = FW_DIR / model.stock_name
     out.write_bytes(data)
     return out
 
@@ -325,8 +339,34 @@ def selftest() -> int:
         valid, _desc, back = describe_image(build_bytes(stock, mask, marker_of(mask)))
         print(f"mods {mask:x}: valid {valid}, marker reads back as {back}")
         ok &= valid and back == mask
+    mfi_local = find_local_firmware(MFI) + [p for p in (TOOLS.parent / "mfi/downloads/8900/ota.bin",) if p.is_file()]
+    if mfi_local:
+        ok &= model_mfi.selftest(read_image(mfi_local[0]))
+    else:
+        print(f"MFi: skipped, no official {MFI.base} file (put {MFI.stock_name} in {FW_DIR})")
     print("SELFTEST OK" if ok else "SELFTEST FAILED")
     return 0 if ok else 1
+
+
+# -- controller models --------------------------------------------------------------------------------------------
+# What the UI needs per model. The BT model's code is in this file; other models live in model_<key>.py.
+
+def bt_save_name(mask: int) -> str:
+    return f"g8-bluetooth-firmware-7.5{mask}.zip"  # name drives the phone app's "newer version" check; 7.5x > 7.1x tests
+
+
+BT = types.SimpleNamespace(
+    key="bt", name="G8+ Bluetooth", blurb="Bluetooth model. Flashes over Bluetooth LE from this laptop (Android "
+    "mode, green light).", base=BASE, stock_name=STOCK_NAME, stock_url=STOCK_URL, features=FEATURES, tested=TESTED,
+    faster_note=FASTER_NOTE, is_stock=is_stock, describe_image=describe_image, build_bytes=build_bytes,
+    marker_of=marker_of, save_name=bt_save_name, can_flash=True, marker_tested=True)
+MFI = types.SimpleNamespace(
+    key="mfi", name=model_mfi.NAME, blurb=model_mfi.BLURB, base=model_mfi.BASE, stock_name=model_mfi.STOCK_NAME,
+    stock_url=model_mfi.STOCK_URL, features=model_mfi.FEATURES, tested=model_mfi.TESTED,
+    faster_note=model_mfi.FASTER_NOTE, is_stock=model_mfi.is_stock, describe_image=model_mfi.describe_image,
+    build_bytes=model_mfi.build_bytes, marker_of=model_mfi.marker_of, save_name=model_mfi.save_name,
+    can_flash=model_mfi.CAN_FLASH, marker_tested=model_mfi.MARKER_TESTED)
+MODELS = [BT, MFI]
 
 
 # -- controller state ---------------------------------------------------------------------------------------------
@@ -521,7 +561,12 @@ class App:
         self.sel = 0   # selected controller
         self.row = 0   # focused row in self.rows()
         self.log: list[str] = []
-        self.choice = [0] * len(FEATURES)  # selected level per mod
+        self.usb: list[dict] = []  # GameSir USB devices (MFi), from sysfs
+        self.m = BT                # controller model shown; MFi if one is plugged in at start
+        self.usb_scan(quiet=True)
+        if self.usb:
+            self.m = MFI
+        self.choice = [0] * len(self.m.features)  # selected level per mod
         self.sources: list[tuple[str, Path | None]] = []  # base firmware options: ("file", path) / ("none"|"choose")
         self.src = 0
         self.busy_action: str | None = None
@@ -573,7 +618,7 @@ class App:
 
     def refresh_sources(self, select: Path | None = None) -> None:
         files = [p for kind, p in self.sources if kind == "file" and p.is_file()]
-        for p in find_local_firmware():
+        for p in find_local_firmware(self.m):
             if p not in files:
                 files.append(p)
         if select is not None and select not in files:
@@ -587,14 +632,20 @@ class App:
     def source_text(self) -> tuple[str, str]:
         kind, path = self.sources[self.src]
         if kind == "file":
-            return f"{path.name}", f"official GameSir {BASE}, in {short_path(path.parent)}"
+            return f"{path.name}", f"official GameSir {self.m.base}, in {short_path(path.parent)}"
         if kind == "none":
-            return ("No firmware file found", f"put {STOCK_NAME} in {short_path(FW_DIR)}, or you'll be offered a download "
+            return ("No firmware file found", f"put {self.m.stock_name} in {short_path(FW_DIR)}, or you'll be offered a download "
                     "from GameSir when you start")
         return "Choose a file...", "press Enter to pick the official GameSir firmware (.zip or .bin)"
 
     def rows(self) -> list[tuple[str, object]]:
-        out: list[tuple[str, object]] = []
+        out: list[tuple[str, object]] = [("model", None)]
+        if self.m is not BT:
+            out.append(("src", None))
+            out += [("mod", i) for i in range(len(self.m.features))]
+            out += [("act", "Save modded firmware to a file"), ("act", "Read controller again"),
+                    ("act", "Check for updates"), ("act", "Quit")]
+            return out
         c = self.ctl
         if len(self.ctls) > 1:
             out.append(("ctl", None))
@@ -768,7 +819,18 @@ class App:
     def draw_body(self, rows, focus) -> int:
         """Draw the scrolling part; returns the first unused body line."""
         y = 2
-        if not self.ctls:
+        f = focus[0] == "model"
+        self.put(y, 1, f"{'>' if f else ' '} Controller type: < {self.m.name} >",
+                 curses.A_REVERSE if f else curses.A_BOLD)
+        if f:
+            self.mark_focus(y, y + 1)
+            y = self.wrapped(y + 1, 6, "Left/Right switch, Enter shows all types. " + self.m.blurb, curses.A_DIM, 0)
+        else:
+            y += 1
+        y += 1
+        if self.m is MFI:
+            y = self.draw_mfi(y)
+        elif not self.ctls:
             for line in ("No controller found yet.",
                          "1. Turn the controller on in Android mode (A + Home, green light).",
                          "2. If it connects to your phone, turn the phone's Bluetooth off for now:",
@@ -839,16 +901,39 @@ class App:
                 self.put(y, 1, f"{'>' if focused else ' '} {name}", curses.A_REVERSE if focused else 0)
             top = y
             y += 1
-            if focused and ACTIONS.get(name) and not self.greyed:
-                y = self.wrapped(y, 5, ACTIONS[name], curses.A_DIM, 0)
+            desc = (ACTIONS_MFI.get(name) if self.m is MFI else None) or ACTIONS.get(name)
+            if focused and desc and not self.greyed:
+                y = self.wrapped(y, 5, desc, curses.A_DIM, 0)
             if focused:
                 self.mark_focus(top, y - 1)
         return y
 
-    def draw_mods(self, y: int, focus) -> int:
+    def draw_mfi(self, y: int) -> int:
+        status, firmware, _mask = model_mfi.usb_status(self.usb)
+        self.put(y, 1, "Controller: G8+ MFi", curses.A_BOLD)
+        y = self.wrapped(y + 1, 3, f"USB:       {status}", self.green if firmware else curses.A_DIM, 11)
+        if firmware:
+            y = self.wrapped(y, 3, f"Firmware:  {firmware}", self.cyan | curses.A_BOLD, 11)
+            y = self.wrapped(y, 14, "read from what the laptop already knows about the controller; nothing is sent "
+                             "to it", curses.A_DIM, 0)
+        y = self.wrapped(y, 3, "Flashing: this app only builds the file. Copy it to your phone and flash it with the "
+                         "GameSir app (local file), with the controller connected to the phone.", 0, 11)
+        return y + 1
+
+    def installed(self) -> tuple[bool, int | None]:
+        """(a controller of the current model is there, its mods mask or None if unknown)."""
+        if self.m is MFI:
+            _status, firmware, mask = model_mfi.usb_status(self.usb)
+            return firmware is not None, mask
         c = self.ctl
-        known = c is not None and c.mask is not None
-        cur = levels_of(c.mask or 0) if c else [0] * len(FEATURES)
+        return c is not None, c.mask if c else None
+
+    def draw_mods(self, y: int, focus) -> int:
+        features = self.m.features
+        have, inst = self.installed()
+        known = inst is not None
+        cur = levels_of(inst or 0, features) if have else [0] * len(features)
+        c = have
         head = "Mods"
         if c and not known:
             head += "  (controller's mods unknown: compared with stock)"
@@ -856,7 +941,7 @@ class App:
             head += "  (* = differs from stock)"
         self.put(y, 1, head, curses.A_BOLD)
         y += 1
-        for i, (_t, slider, levels) in enumerate(FEATURES):
+        for i, (_t, slider, levels) in enumerate(features):
             lvl = self.choice[i]
             _bits, desc, note, meter = levels[lvl]
             if lvl != cur[i]:
@@ -877,19 +962,20 @@ class App:
                 self.put(y, 26, "Fast")
                 self.put(y, 32, note, curses.A_DIM)
                 y += 1
-                if lvl:
-                    y = self.wrapped(y, 10, FASTER_NOTE, self.yellow, 0)
+                if lvl and self.m.faster_note:
+                    y = self.wrapped(y, 10, self.m.faster_note, self.yellow, 0)
             elif note:
                 y = self.wrapped(y, 10, note, curses.A_DIM, 0)
             if focused:
                 self.mark_focus(top, y - 1)
-        mask = mask_of(self.choice)
-        if known and mask == c.mask:
+        mask = mask_of(self.choice, features)
+        tested = self.m.tested
+        if known and mask == inst:
             y = self.wrapped(y + 1, 3, "This is what the controller has now.", curses.A_DIM, 0)
         else:
             msg = ("* = changes when you flash. " if c else "") + (
-                "Tested combination." if mask in TESTED else "This combination is not tested on a controller yet.")
-            y = self.wrapped(y + 1, 3, msg, self.green if mask in TESTED else self.red, 0)
+                "Tested combination." if mask in tested else "This combination is not tested on a controller yet.")
+            y = self.wrapped(y + 1, 3, msg, self.green if mask in tested else self.red, 0)
         return y
 
     def steps_lines(self, width: int) -> list[tuple[str, int]]:
@@ -988,12 +1074,12 @@ class App:
             return ("file", path) if kind == "file" else None
         while True:
             ans = self.dialog("Firmware file needed", [
-                (f"The mods are applied to GameSir's official firmware {BASE}, and there's no copy of it here yet. "
+                (f"The mods are applied to GameSir's official firmware {self.m.base}, and there's no copy of it here yet. "
                  "We don't include it with this app because it's GameSir's.", 0),
                 ("", 0),
-                (f"Download: gets {STOCK_NAME} from GameSir's own update server, checks it and saves it "
+                (f"Download: gets {self.m.stock_name} from GameSir's own update server, checks it and saves it "
                  f"in {FW_DIR} so you're not asked again.", 0),
-                (f"Add it yourself: put {STOCK_NAME} (or its ota.bin) in {FW_DIR} or next to this app.", 0),
+                (f"Add it yourself: put {self.m.stock_name} (or its ota.bin) in {FW_DIR} or next to this app.", 0),
             ], ["Download from GameSir", "Choose a file...", "I'll add it myself", "Cancel"], default=0)
             if ans == 0:
                 return ("download", None)
@@ -1008,27 +1094,27 @@ class App:
                     FW_DIR.mkdir(parents=True, exist_ok=True)
                 except OSError:
                     pass
-                self.info("Add the firmware file", f"Put {STOCK_NAME} in this folder:  {FW_DIR}   "
+                self.info("Add the firmware file", f"Put {self.m.stock_name} in this folder:  {FW_DIR}   "
                           "(or next to this app). Then start again; the app finds it by itself.")
             return None
 
     def base_step_name(self, plan) -> str:
         if plan[0] == "file":
-            return f"Check base firmware {plan[1].name} (must be official GameSir {BASE})"
-        return f"Download official GameSir {BASE} from GameSir's update server, check it and save it to {FW_DIR}"
+            return f"Check base firmware {plan[1].name} (must be official GameSir {self.m.base})"
+        return f"Download official GameSir {self.m.base} from GameSir's update server, check it and save it to {FW_DIR}"
 
     def get_base(self, plan) -> bytes:
         """Bytes of the base firmware; must be official 2.20 (runs in the worker thread)."""
         if plan[0] == "file":
             enc = read_image(plan[1])
-            if not is_stock(enc):
-                raise ValueError(f"{plan[1].name} is not the official GameSir {BASE} firmware")
+            if not self.m.is_stock(enc):
+                raise ValueError(f"{plan[1].name} is not the official GameSir {self.m.base} firmware")
             return enc
         try:
-            path = download_stock()
+            path = download_stock(self.m)
         except Exception as exc:
             raise RuntimeError(f"download failed ({exc}). GameSir may have moved the file: put a copy of "
-                               f"{STOCK_NAME} in {FW_DIR} instead.") from exc
+                               f"{self.m.stock_name} in {FW_DIR} instead.") from exc
         plan[1] = path
         return read_image(path)
 
@@ -1041,19 +1127,20 @@ class App:
         except Exception as exc:
             self.info("Can't use this file", f"{p.name}: {exc}")
             return
-        if is_stock(enc):
+        if self.m.is_stock(enc):
             self.refresh_sources(select=p)
-            self.say(f"base firmware: {p.name} (official {BASE})")
+            self.say(f"base firmware: {p.name} (official {self.m.base})")
             return
-        valid, desc, _mask = describe_image(enc)
+        valid, desc, _mask = self.m.describe_image(enc)
         self.info("Can't mod this file",
-                  f"{p.name} is {'a G8+ Bluetooth firmware, but ' + desc if valid else desc}. Mods can only be "
-                  f"applied to the official GameSir {BASE} firmware. To flash this file without changes, use "
-                  "'Flash a firmware file as-is'.")
+                  f"{p.name} is {f'a {self.m.name} firmware, but ' + desc if valid else desc}. Mods can only be "
+                  f"applied to the official GameSir {self.m.base} firmware."
+                  + (" To flash this file without changes, use 'Flash a firmware file as-is'." if self.m.can_flash
+                     else ""))
 
     def base_and_build(self, steps: Steps, plan, mask: int) -> bytes:
         """Steps 0-2: base firmware, apply mods, build image. Returns the image; raises on failure."""
-        base = self.step(steps, 0, "Checking base firmware", lambda: self.get_base(plan), f"official {BASE}, OK")
+        base = self.step(steps, 0, "Checking base firmware", lambda: self.get_base(plan), f"official {self.m.base}, OK")
         if plan[0] == "download":
             self.refresh_sources(select=plan[1])
 
@@ -1063,7 +1150,7 @@ class App:
                 steps.set(2, "run")
         steps.set(1, "run")
         image = self.working(None, "Applying mods and building",
-                             lambda: build_bytes(base, mask, marker_of(mask), mark))
+                             lambda: self.m.build_bytes(base, mask, self.m.marker_of(mask), mark))
         steps.set(2, "done", f"{len(image)} bytes, checksums OK")
         return image
 
@@ -1285,7 +1372,8 @@ class App:
                     "The controller runs stock GameSir firmware." if ok else self.RECOVERY, ok)
 
     def act_save(self) -> None:
-        mask = mask_of(self.choice)
+        m = self.m
+        mask = mask_of(self.choice, m.features)
         if mask == 0:
             self.info("No mods selected", "Select at least one mod first; an unmodified file is just GameSir's own.")
             return
@@ -1295,11 +1383,14 @@ class App:
         plan = list(plan)
         out_dir = Path.home() / "Downloads"
         out_dir = out_dir if out_dir.is_dir() else Path.cwd()
-        ver = f"7.5{mask}"  # zip name drives the phone app's "newer version" check; 7.5x > our 7.1x test builds
-        out = out_dir / f"g8-bluetooth-firmware-{ver}.zip"
-        names = [self.base_step_name(plan), "Apply mods: " + "; ".join(mods_text(mask)),
+        out = out_dir / m.save_name(mask)
+        names = [self.base_step_name(plan), "Apply mods: " + "; ".join(mods_text(mask, m.features)),
                  "Build firmware image (checksums, encryption, self-check)", f"Save as {out}"]
-        warn = [] if mask in TESTED else ["This combination has not been tested on a controller yet."]
+        warn = [] if mask in m.tested else ["This combination has not been tested on a controller yet."]
+        if not m.marker_tested:
+            warn.append("New: the file carries a build marker (one descriptor byte, so this app can later see which "
+                        "mods are installed). The mods are the tested code, but no marked build has run on this "
+                        "model yet: check the buttons after flashing.")
         if out.exists():
             warn.append(f"{out.name} already exists in {short_path(out_dir)} and will be replaced.")
         if not self.confirm("Save modded firmware", names, [("Nothing is flashed.", curses.A_DIM)], warn, flashing=False):
@@ -1316,8 +1407,10 @@ class App:
             self.stopped(steps, exc, "No file was saved.")
             return
         self.say(f"saved {out}")
-        self.finish(steps, "Saved", f"Saved {out}. Flash it with 'Flash a firmware file as-is', or with the GameSir "
-                    "phone app ('local file'; the version in the name makes the app accept it).", True)
+        how = ("Flash it with 'Flash a firmware file as-is', or with the GameSir phone app" if m.can_flash
+               else "Copy it to your phone and flash it with the GameSir phone app")
+        self.finish(steps, "Saved", f"Saved {out}. {how} ('local file'; the version in the name makes the app "
+                    "accept it).", True)
 
     def act_flash_file(self, c: Controller) -> None:
         p = self.pick_file()
@@ -1358,8 +1451,44 @@ class App:
         ok = self.flash_and_check(c, steps, 1, path, expect)
         self.finish(steps, "Done" if ok else "Problem", "Flashed." if ok else self.RECOVERY, ok)
 
+    def set_model(self, model) -> None:
+        if model is self.m:
+            return
+        self.m = model
+        self.sources, self.src = [], 0
+        self.refresh_sources()
+        _have, inst = self.installed()
+        self.choice = levels_of(inst, model.features) if inst is not None else [0] * len(model.features)
+        self.say(f"controller type: {model.name}")
+
+    def pick_model(self) -> None:
+        lines = []
+        for mdl in MODELS:
+            lines += [(mdl.name, curses.A_BOLD), (f"  {mdl.blurb}", 0)]
+            if mdl is MFI:
+                lines.append((f"  USB: {model_mfi.usb_status(self.usb)[0]}", curses.A_DIM))
+            elif self.ctls:
+                lines.append((f"  Bluetooth: {len(self.ctls)} found in the last scan", curses.A_DIM))
+            lines.append(("", 0))
+        ans = self.dialog("Controller type", lines, [mdl.name for mdl in MODELS], MODELS.index(self.m))
+        if ans is not None:
+            self.set_model(MODELS[ans])
+
+    def usb_scan(self, quiet: bool = False) -> None:
+        self.usb = model_mfi.usb_devices()
+        if not quiet:
+            status, _fw, mask = model_mfi.usb_status(self.usb)
+            self.say(f"USB: {status}")
+            if mask is not None:
+                self.choice = levels_of(mask, MFI.features)
+
     def change(self, kind, idx, step: int) -> None:
-        if kind == "ctl" and self.ctls:
+        if kind == "model":
+            if step == 2:
+                self.pick_model()
+            else:
+                self.set_model(MODELS[(MODELS.index(self.m) + (1 if step > 0 else -1)) % len(MODELS)])
+        elif kind == "ctl" and self.ctls:
             self.sel = (self.sel + (1 if step > 0 else -1)) % len(self.ctls)
             if self.ctl.mask is not None:
                 self.choice = levels_of(self.ctl.mask)
@@ -1369,8 +1498,8 @@ class App:
             else:
                 self.src = (self.src + (1 if step > 0 else -1)) % len(self.sources)
         elif kind == "mod":
-            n = len(FEATURES[idx][2])
-            if FEATURES[idx][1]:  # slider: stops at the ends; Enter wraps around
+            n = len(self.m.features[idx][2])
+            if self.m.features[idx][1]:  # slider: stops at the ends; Enter wraps around
                 self.choice[idx] = (max(0, min(n - 1, self.choice[idx] + step)) if abs(step) == 1
                                     else (self.choice[idx] + 1) % n)
             else:
@@ -1402,6 +1531,8 @@ class App:
                 self.check_updates()
             elif name == "Save modded firmware to a file":
                 self.act_save()
+            elif self.m is MFI and name == "Read controller again":
+                self.usb_scan()
             elif c and name == "Read controller again":
                 self.read(c)
             elif c and name == "Remove laptop pairing":
@@ -1417,7 +1548,8 @@ class App:
         return True
 
     def loop(self) -> None:
-        self.row = self.rows().index(("act", "Scan for controllers"))
+        first = ("act", "Scan for controllers") if self.m is BT else ("act", "Save modded firmware to a file")
+        self.row = self.rows().index(first)
         while True:
             self.draw()
             rows = self.rows()

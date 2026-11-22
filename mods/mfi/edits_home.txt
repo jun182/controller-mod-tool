@@ -1,0 +1,3 @@
+# 9107 Home fix (Android/HID mode, fw 8900): Home sent instantly; Home+D-pad volume shortcut removed. Source v9107/home.s
+1d19c:3484   # was "if (b[+31]==0) goto 200" -> always skip the Home hold-back state machine (800 ms delay)
+1cb92:148200000000   # was "if (word&0x11000 != 0x11000) goto 28" -> goto 0x1E1CBD8, past both Home+D-pad volume checks; 2 nops
