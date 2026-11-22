@@ -5,7 +5,7 @@ version)**, firmware 2.20, and **GameSir G8+ MFi (wired)**, firmware 8900 (build
 type in the top row of the app. Terminal app for Linux, used with the arrow keys, Enter and Esc.
 
 > [!CAUTION]
-> **USE AT YOUR OWN RISK. NO WARRANTY. WE ARE NOT RESPONSIBLE FOR ANY DAMAGE.**
+> **USE AT YOUR OWN RISK. NO WARRANTY. I AM MOST DEFINITELY NOT RESPONSIBLE FOR ANY DAMAGE.**
 >
 > - This is an **unofficial, experimental beta**. It is **not made, endorsed or supported by GameSir** (or any other
 >   controller maker). "GameSir" and "G8+" are names of their owners, used only to say which hardware this works with.
