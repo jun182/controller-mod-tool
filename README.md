@@ -86,7 +86,15 @@ controller over Bluetooth LE with the same update protocol the GameSir app uses.
 
 ## Credits
 
-Inspired by enij90's firmware patches for the Lenovo Legion G9 controller (https://github.com/enij90/legion-g9-firmware).
+Built on the work of **enij90** and their firmware patches for the Lenovo Legion G9 controller
+(https://github.com/enij90/legion-g9-firmware), which runs on the same Jieli chip family. From that project we learned:
+
+- how these Jieli firmware images are scrambled and how to unscramble them (the SFC keystream; the G8+ uses the same
+  scheme with a different key, which we found ourselves),
+- the approach of shipping no firmware: download the official image and apply small edit files (`offset:bytes`),
+- how the back buttons are wired and remapped on a Jieli controller, which guided our G8+ work.
+
+Our code is our own implementation; no code was copied from that project. Thank you, enij90!
 
 ## Licence
 
