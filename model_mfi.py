@@ -18,7 +18,8 @@ import mfifw  # noqa: E402
 
 KEY = "mfi"
 NAME = "G8+ MFi (wired)"
-BLURB = "USB cable only. The app builds a firmware file; you flash it with the GameSir phone app."
+BLURB = ("USB cable only. The app builds a firmware file; you flash it with the GameSir phone app (takes under a "
+         "second; that is normal).")
 BASE = "8900"
 STOCK_NAME = "G8-Plus-MFi-firmware-8900.zip"
 STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME

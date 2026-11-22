@@ -101,6 +101,12 @@ Up/Down move, Left/Right or Enter change a mod, Enter runs an action, Esc goes b
 charge the controller, plug the laptop in, keep both close together, and don't touch the controller until the
 app says Done (about 2 minutes).
 
+**How long a flash takes:**
+- **G8+ Bluetooth** (flashed by this app over Bluetooth): about **2 minutes**, with a progress percentage. Keep the
+  controller on and close by until the app says Done.
+- **G8+ MFi** (flashed with the GameSir phone app over the cable): **under a second**. That is normal, not a failed
+  update: the controller restarts with the new firmware straight away.
+
 Optional: name your own controllers in `known_controllers.json` next to the script, for example
 `{"A0:5A:59:12:34:56": "spare"}`. If you name one "spare" or "test", the app warns before flashing any other.
 
