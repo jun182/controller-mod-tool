@@ -1,0 +1,6 @@
+# Second stick filter off, green (BLE/Android) mode only (G8+ BT 2.20). The green report builder smooths each of the 4
+# stick bytes again: 0x1E17324..0x1E1735C, y2 = b[0x42E0+42+i] = (y2 + y1) >> 1 with y1 = b[0x42E0+46+i] (output of the
+# main stick filter 0x1E02812); only exactly 0/128/255 pass raw. 0x1E17334 "r3 += r1; r3 = r3 >> 1" -> "r3 = r1; nop":
+# the state byte and the report byte then get y1 unchanged (the 0/128/255 branches give the same byte). Use together
+# with edits_stick_raw.txt. Other modes (BT Xbox 0x1E115B0, USB XInput 0x1E0329E) have their own copy, not touched.
+17334:13160000

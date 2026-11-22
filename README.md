@@ -31,7 +31,7 @@ version)**, firmware 2.20. Terminal app for Linux, used with the arrow keys, Ent
 |---|---|---|
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
 | Input speed | Standard (~27 updates/s, stock) / Fast (~58/s) / Fastest (~115/s) | tested together with independent back buttons |
-| Stick smoothing | on (stock: slow stick moves lag ~24 ms) / off (sticks respond at once, tiny jitter near the centre) | experimental: measured on one controller |
+| Stick smoothing | Stock (two filters: ~24 ms + ~8 ms lag on slow moves) / Light (first filter off) / Off (both off) | tested on one controller: no idle jitter measured, feels good in games |
 
 Faster input speed makes the Bluetooth radio work more often, so it probably uses more battery (not measured yet).
 It can also disturb DS4 mode if your phone is paired with the controller in both modes. Combinations without the
@@ -48,6 +48,12 @@ back-button mod have not been tested on a controller yet; the app warns about th
 
 Whatever the source, the app only applies mods to a file that is byte-identical to the official 2.20
 (sha256 `8e5d2d0c49eecbc9e9bad78adf11e9e43a501c088693c9fdd4eea46978768160`).
+
+## Updates
+
+The app shows its version in the top line (`python3 g8tui.py --version` prints it too). **Check for updates** in the
+menu asks GitHub for the newest release and tells you; it never downloads or installs anything. Update with
+`git pull` in the app's folder. Versions follow [Semantic Versioning](https://semver.org); 0.x versions are beta.
 
 ## Requirements
 

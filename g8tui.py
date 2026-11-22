@@ -15,10 +15,11 @@ What it does, step by step and visibly:
 We never ship GameSir's firmware: only this script and our edit files.
 
 Build marker: Report Map byte at file 0x2C124 (hat physical max, stock `46 3b 01`). Our builds write
-0x20 | mask (4 mask bits below, 0x21-0x2f); 0x3a = 7.17 (mask 7, older marker); 0x3b = stock or an unmarked test
-build.
+0x20 | mask for masks below 0x10 (0x21-0x2f), 0x40 | mask for masks with bit 0x10 (0x50-0x5f; 0x30-0x3f is avoided
+because 0x3a = 7.17 (mask 7, older marker) and 0x3b = stock or an unmarked test build).
 
 Run:       python3 g8tui.py
+Version:   python3 g8tui.py --version
 Self-test: python3 g8tui.py --selftest   (builds every mod combination and reads its marker back; no network)
 """
 
@@ -50,12 +51,18 @@ BASE = "2.20"
 STOCK_NAME = "g8-bluetooth-firmware-2.20.zip"
 STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME
 REPO_STOCK_ZIP = CR / "v7.17/g8-bluetooth-firmware-2.22.zip"  # our saved copy (= official 2.20); self-test only
+# App version, Semantic Versioning (semver.org). 0.y.z = beta: anything may still change. Bump MINOR for new mods or
+# features, PATCH for fixes; 1.0.0 = first release we call stable. Git tag each release as v<version>.
+VERSION = "0.1.0"
+AUTHOR = "jun182"
+REPO = "jun182/controller-mod-tool"  # GitHub; releases are tagged v<VERSION>
+
 MARKER_OFFSET = 0x2C124
-MARKER_STOCK, MARKER_717, MARKER_BASE = 0x3B, 0x3A, 0x20
+MARKER_STOCK, MARKER_717, MARKER_BASE, MARKER_BASE2 = 0x3B, 0x3A, 0x20, 0x40
 IMAGE_SIZE = 393908            # every G8+ BT image built on 2.20 (stock and ours) has exactly this size
 HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)  # hat: phys min 0, phys max 0x01xx, unit (Report Map)
 
-PADDLES, RATE58, RATE115, STICKRAW = 1, 2, 4, 8
+PADDLES, RATE58, RATE115, STICKRAW, STICKRAW2 = 1, 2, 4, 8, 16
 MODS_DIRS = [TOOLS / "mods", CR / "v7.17"]  # (tools/mods also exists in the private repo, for newer mods)  # public layout: mods/ next to the app; private repo: claude-re/v7.17
 MAX_FILE = 4_000_000  # bytes; firmware files are ~0.4 MB, anything much bigger is not one
 EDITS = {  # mask bit -> edit files (offset:hex lines), the same files the tested builds were made from
@@ -63,9 +70,12 @@ EDITS = {  # mask bit -> edit files (offset:hex lines), the same files the teste
     RATE58: ["edits_interval.txt", "edits_accept.txt"],
     RATE115: ["edits_gate2.txt"],
     STICKRAW: ["edits_stick_raw.txt"],
+    STICKRAW2: ["edits_stick_raw2.txt"],
 }
 # Masks whose code is byte-identical to a build tested on hardware (only the marker byte differs).
-TESTED = {0: "stock", PADDLES: "7.1", PADDLES | RATE58: "7.13/7.15", PADDLES | RATE58 | RATE115: "7.17"}
+TESTED = {0: "stock", PADDLES: "7.1", PADDLES | RATE58: "7.13/7.15", PADDLES | RATE58 | RATE115: "7.17",
+          PADDLES | RATE58 | RATE115 | STICKRAW: "mods 0xF (2026-11-22)",
+          PADDLES | RATE58 | RATE115 | STICKRAW | STICKRAW2: "mods 0x1F (2026-11-22)"}
 
 # Rates measured on Linux: stock ~27 reports/s, 7.13 ~58/s, 7.17 ~115/s. Battery cost not measured: faster = the BLE
 # radio wakes every 7.5 ms instead of every 18.75 ms, so it should cost battery.
@@ -82,10 +92,11 @@ FEATURES = [
         (RATE58, "Input speed: Fast", "~58 updates per second", 5),
         (RATE58 | RATE115, "Input speed: Fastest", "~115 updates per second", 10),
     ]),
-    ("Stick smoothing", False, [
-        (0, "Stick smoothing on (stock)", "slow stick moves lag ~24 ms behind; hides stick jitter", None),
-        (STICKRAW, "Stick smoothing off", "sticks respond at once; may jitter a little near the centre (experimental)",
-         None),
+    ("Stick smoothing", True, [
+        (0, "Stick smoothing: Stock", "filter 1 (+~24 ms) + filter 2 (+~8 ms) on slow moves; hides stick jitter (centre ±3)", 3),
+        (STICKRAW, "Stick smoothing: Light", "filter 1 off (-24 ms), filter 2 on (+~8 ms); centre jitter ±5 (measured)", 7),
+        (STICKRAW | STICKRAW2, "Stick smoothing: Off",
+         "both off (-32 ms; filter 2 only in Android mode); no idle jitter measured on our unit", 10),
     ]),
 ]
 
@@ -97,6 +108,7 @@ ACTIONS = {  # name -> one-line description of what happens, shown under the foc
     "Read controller again": "connect and read which mods the controller has (changes nothing)",
     "Remove laptop pairing": "forget the controller in the laptop's Bluetooth settings (needed before flashing)",
     "Scan for controllers": "look for GameSir controllers nearby (about 6 s)",
+    "Check for updates": "ask GitHub for the newest release and tell you (downloads and installs nothing)",
     "Quit": "",
 }
 
@@ -152,8 +164,8 @@ def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
         return None, f"GameSir stock {BASE} (or an early test build without a marker)"
     if b == MARKER_717:
         return PADDLES | RATE58 | RATE115, f"Modified firmware (GameSir {BASE} + mods)"
-    mask = b & 0x0F
-    if b & 0xF0 == MARKER_BASE and mask and mask == mask_of(levels_of(mask)):
+    mask = b & 0x0F if b & 0xF0 == MARKER_BASE else b & 0x1F if b & 0xF0 == MARKER_BASE2 | 0x10 else 0
+    if mask and mask == mask_of(levels_of(mask)):
         return mask, f"Modified firmware (GameSir {BASE} + mods)"
     return None, f"Unknown firmware (marker 0x{b:02x}, newer than this tool?)"
 
@@ -259,6 +271,28 @@ def mod_edits(mask: int) -> list[tuple[int, bytes]]:
     return g8fw.read_edits(files) if files else []
 
 
+def version_key(v: str) -> tuple:
+    """'v0.2.0' / '0.2.0-beta.1' -> comparable tuple (a pre-release sorts before its release)."""
+    core, _, pre = v.strip().lstrip("v").partition("-")
+    nums = tuple(int(x) for x in core.split("."))
+    return nums + ((0, pre) if pre else (1, ""))
+
+
+def latest_release() -> str:
+    """Tag of the newest GitHub release (one GET to api.github.com, nothing downloaded or installed)."""
+    import json
+    req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+                                 headers={"User-Agent": "g8tui", "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        tag = json.load(resp)["tag_name"]
+    version_key(tag)  # raises on a tag we can't compare
+    return tag.lstrip("v")
+
+
+def marker_of(mask: int) -> int:
+    return (MARKER_BASE2 if mask & 0x10 else MARKER_BASE) | mask
+
+
 def build_bytes(stock_enc: bytes, mask: int, marker: int | None, step=lambda name: None) -> bytes:
     """Stock 2.20 + edits for `mask` (+ marker byte unless None). Calls step('build') between the stages."""
     if not is_stock(stock_enc):
@@ -287,8 +321,8 @@ def selftest() -> int:
         same = build_bytes(stock, mask, marker) == (CR / ref).read_bytes()
         print(f"mods {mask:x} -> {ref}: {'identical' if same else 'DIFFERENT'}")
         ok &= same
-    for mask in sorted({mask_of([a, b, c]) for a in range(2) for b in range(3) for c in range(2)} - {0}):
-        valid, _desc, back = describe_image(build_bytes(stock, mask, MARKER_BASE | mask))
+    for mask in sorted({mask_of([a, b, c]) for a in range(2) for b in range(3) for c in range(3)} - {0}):
+        valid, _desc, back = describe_image(build_bytes(stock, mask, marker_of(mask)))
         print(f"mods {mask:x}: valid {valid}, marker reads back as {back}")
         ok &= valid and back == mask
     print("SELFTEST OK" if ok else "SELFTEST FAILED")
@@ -574,7 +608,7 @@ class App:
                     ("act", "Read controller again")]
             if c.paired:
                 out.append(("act", "Remove laptop pairing"))
-        out += [("act", "Scan for controllers"), ("act", "Quit")]
+        out += [("act", "Scan for controllers"), ("act", "Check for updates"), ("act", "Quit")]
         return out
 
     # -- dialogs -------------------------------------------------------------------------------------------
@@ -695,7 +729,7 @@ class App:
         rows = self.rows()
         self.row = min(self.row, len(rows) - 1)
         focus = rows[self.row]
-        self.put(0, 1, "GameSir G8+ mod tool", curses.A_BOLD, keep=True)
+        self.put(0, 1, f"GameSir G8+ mod tool {VERSION} (beta) · by {AUTHOR} · github.com/{REPO}", curses.A_BOLD, keep=True)
         if busy:
             self.put(1, 1, f"{busy}   (please wait)", curses.A_BOLD | self.cyan, keep=True)
         self.body = True
@@ -1029,7 +1063,7 @@ class App:
                 steps.set(2, "run")
         steps.set(1, "run")
         image = self.working(None, "Applying mods and building",
-                             lambda: build_bytes(base, mask, MARKER_BASE | mask, mark))
+                             lambda: build_bytes(base, mask, marker_of(mask), mark))
         steps.set(2, "done", f"{len(image)} bytes, checksums OK")
         return image
 
@@ -1342,6 +1376,19 @@ class App:
             else:
                 self.choice[idx] = (self.choice[idx] + (1 if step > 0 else -1)) % n
 
+    def check_updates(self) -> None:
+        try:
+            latest = self.working("Check for updates", "Asking GitHub", latest_release)
+        except Exception as exc:  # offline, private repo, rate limit, bad reply
+            self.info("Check for updates", f"Couldn't check ({exc}). You have {VERSION}. "
+                      f"Releases: https://github.com/{REPO}/releases")
+            return
+        if version_key(latest) > version_key(VERSION):
+            self.info("Update available", f"Version {latest} is available (you have {VERSION}). Get it with "
+                      f"'git pull' in the app's folder, or from https://github.com/{REPO}/releases")
+        else:
+            self.info("Check for updates", f"You have the newest version ({VERSION}).")
+
     def run_action(self, name: str) -> bool:
         """Returns False to quit."""
         c = self.ctl
@@ -1351,6 +1398,8 @@ class App:
         try:
             if name == "Scan for controllers":
                 self.scan()
+            elif name == "Check for updates":
+                self.check_updates()
             elif name == "Save modded firmware to a file":
                 self.act_save()
             elif c and name == "Read controller again":
@@ -1398,6 +1447,9 @@ class App:
 
 
 def main() -> int:
+    if "--version" in sys.argv:
+        print(f"g8tui {VERSION} (beta)")
+        return 0
     if "--selftest" in sys.argv:
         return selftest()
     try:
