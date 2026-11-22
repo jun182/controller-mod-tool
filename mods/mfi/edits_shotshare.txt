@@ -1,0 +1,6 @@
+# MFi (fw 8900, Android/HID mode) screenshot button -> 'Share' (Consumer Record 0xB2 -> Linux KEY_RECORD 167 ->
+# Android MEDIA_RECORD; Nightjar shows 'Share' and sends the host its Misc/Share button).
+# 1) Descriptor media bits VolDown(0xEA), VolUp(0xE9), Power(0x30): Power (bit 2) -> Record (0xB2), same length.
+30a6e:b2
+# 2) 0x1E1CC04 'r1 = r0 | 0x5' (VolDown + Power, 200 ms pulse) -> '| 0x4' (bit 2 = Record only).
+1cc06:04

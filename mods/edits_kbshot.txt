@@ -1,0 +1,7 @@
+# Screenshot button -> keyboard key (green/Android BLE mode). Source tools/mods/kbshot.s (from claude-re/v7.91, which
+# tested F13 on the spare 2026-11-22; this version loads the key with the fixed 6-byte form `c2 ff <u32 LE>` so the
+# app can put any key in: u32 = modifiers | key << 16, template F13 = 0x00680000).
+# Rewrites 0x1E178A8..0x1E178ED (70 B) of the screenshot block; keeps the shared send tail 0x1E178EE..0x1E178F9 and
+# enters its call 0x1E178F2 with r0 = 52 (keyboard input report handle, report ID 1), r1 = r14+1624, r2 = 8.
+# Report [modifiers, 0, key, 0, 0, 0, 0, 0]; release sends zeros. Reviews: docs/reviews/2026-11-22-*-bt-kbshot.md
+178a8:41e00402d8eee01162e1200043200241432103e81e1041e00402d8eee13101e158e6422092610343c2ff00006800926048344228048a00000000000000000000000000000000

@@ -63,11 +63,11 @@ AUTHOR = "jun182"
 REPO = "jun182/controller-mod-tool"  # GitHub; releases are tagged v<VERSION>
 
 MARKER_OFFSET = 0x2C124
-MARKER_STOCK, MARKER_717, MARKER_BASE, MARKER_BASE2 = 0x3B, 0x3A, 0x20, 0x40
+MARKER_STOCK, MARKER_717, MARKER_BASE, MARKER_BASE2, MARKER_SHOT, MARKER_BACK, MARKER_SHARE = 0x3B, 0x3A, 0x20, 0x40, 0x60, 0x80, 0xA0
 IMAGE_SIZE = 393908            # every G8+ BT image built on 2.20 (stock and ours) has exactly this size
 HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)  # hat: phys min 0, phys max 0x01xx, unit (Report Map)
 
-PADDLES, RATE58, RATE115, STICKRAW, STICKRAW2 = 1, 2, 4, 8, 16
+PADDLES, RATE58, RATE115, STICKRAW, STICKRAW2, SHOTKEY, SHOTBACK, SHOTSHARE = 1, 2, 4, 8, 16, 32, 64, 128
 MODS_DIRS = [TOOLS / "mods", CR / "v7.17"]  # (tools/mods also exists in the private repo, for newer mods)  # public layout: mods/ next to the app; private repo: claude-re/v7.17
 MAX_FILE = 4_000_000  # bytes; firmware files are ~0.4 MB, anything much bigger is not one
 EDITS = {  # mask bit -> edit files (offset:hex lines), the same files the tested builds were made from
@@ -76,11 +76,16 @@ EDITS = {  # mask bit -> edit files (offset:hex lines), the same files the teste
     RATE115: ["edits_gate2.txt"],
     STICKRAW: ["edits_stick_raw.txt"],
     STICKRAW2: ["edits_stick_raw2.txt"],
+    SHOTKEY: ["edits_kbshot.txt"],
+    SHOTBACK: ["edits_shotback.txt"],
+    SHOTSHARE: ["edits_shotshare.txt"],
 }
 # Masks whose code is byte-identical to a build tested on hardware (only the marker byte differs).
 TESTED = {0: "stock", PADDLES: "7.1", PADDLES | RATE58: "7.13/7.15", PADDLES | RATE58 | RATE115: "7.17",
           PADDLES | RATE58 | RATE115 | STICKRAW: "mods 0xF (2026-11-22)",
-          PADDLES | RATE58 | RATE115 | STICKRAW | STICKRAW2: "mods 0x1F (2026-11-22)"}
+          PADDLES | RATE58 | RATE115 | STICKRAW | STICKRAW2: "mods 0x1F (2026-11-22)",
+          PADDLES | RATE58 | RATE115 | STICKRAW | STICKRAW2 | SHOTBACK: "7.93 (screenshot = Android Back, 2026-11-22)",
+          PADDLES | RATE58 | RATE115 | STICKRAW | STICKRAW2 | SHOTSHARE: "7.94 (screenshot = Share, 2026-11-22)"}
 
 # Rates measured on Linux: stock ~27 reports/s, 7.13 ~58/s, 7.17 ~115/s. Battery cost not measured: faster = the BLE
 # radio wakes every 7.5 ms instead of every 18.75 ms, so it should cost battery.
@@ -104,7 +109,53 @@ FEATURES = [
         (STICKRAW | STICKRAW2, "Stick smoothing: Off",
          "both off (-32 ms; filter 2 only in Android mode); no idle jitter measured on our unit", 10),
     ]),
+    ("Screenshot button", False, [
+        (0, "Screenshot button: phone screenshot (stock)",
+         "sends Volume Down + Power: Android takes a screenshot (a PC may open its power/logout menu instead)", None),
+        (SHOTBACK, "Screenshot button: Android Back", "the system Back key (like the phone's back gesture); apps such "
+         "as Nightjar/Moonlight can bind it to their menu or exit", None),
+        (SHOTSHARE, "Screenshot button: Share", "the media Record key (Android MEDIA_RECORD): Nightjar shows it as "
+         "'Share' and sends it to the PC as the controller's Share button", None),
+        (SHOTKEY, "Screenshot button: Print Screen key", "a keyboard key: PCs take a screenshot; bind it in your apps", None),
+        (SHOTKEY, "Screenshot button: F13 key", "a keyboard key no PC or phone uses by default: bind it in Steam, "
+         "Nightjar etc. (Linux desktops treat F13 as 'Tools')", None),
+        (SHOTKEY, "Screenshot button: custom key", "any key or combo you type, e.g. ctrl+shift+f12 (Enter to change)",
+         None),
+    ]),
 ]
+SHOT_FEATURE = len(FEATURES) - 1
+SHOT_PRESETS = {3: (0, 0x46, "Print Screen"), 4: (0, 0x68, "F13")}  # level -> (modifiers, HID key, label)
+SHOT_CUSTOM = 5  # level index of "custom key"
+SHOT_TEMPLATE = bytes.fromhex("c2ff00006800")  # 'r2 = 0x00680000' (F13) in edits_kbshot.txt: u32 = mods | key << 16
+SHOT_NOTE = ("Keyboard keys work in Android mode (green light); the phone-screenshot combo is then gone. The "
+             "controller doesn't report which key it has, only that it sends one.")
+HID_KEYS = {**{chr(ord("a") + i): 0x04 + i for i in range(26)}, **{str((i + 1) % 10): 0x1E + i for i in range(10)},
+            **{f"f{i}": 0x3A + i - 1 for i in range(1, 13)}, **{f"f{i}": 0x68 + i - 13 for i in range(13, 25)},
+            "enter": 0x28, "esc": 0x29, "backspace": 0x2A, "tab": 0x2B, "space": 0x2C, "minus": 0x2D, "equal": 0x2E,
+            "printscreen": 0x46, "prtsc": 0x46, "scrolllock": 0x47, "pause": 0x48, "insert": 0x49, "home": 0x4A,
+            "pageup": 0x4B, "delete": 0x4C, "end": 0x4D, "pagedown": 0x4E, "right": 0x4F, "left": 0x50, "down": 0x51,
+            "up": 0x52, "menu": 0x65}
+HID_MODS = {"ctrl": 0x01, "shift": 0x02, "alt": 0x04, "win": 0x08, "super": 0x08, "meta": 0x08,
+            "rctrl": 0x10, "rshift": 0x20, "altgr": 0x40, "ralt": 0x40, "rwin": 0x80}
+
+
+def parse_combo(text: str) -> tuple[int, int, str]:
+    """'ctrl+shift+f12' -> (modifier bits, HID key, tidy label). One key plus any modifiers. Raises ValueError."""
+    parts = [p for p in text.lower().replace(" ", "").split("+") if p]
+    mods, keys = 0, []
+    for p in parts:
+        if p in HID_MODS:
+            mods |= HID_MODS[p]
+        elif p in HID_KEYS:
+            keys.append(p)
+        else:
+            raise ValueError(f"unknown key '{p}'")
+    if len(keys) != 1:
+        raise ValueError("give exactly one key (plus any of ctrl, shift, alt, win, altgr)")
+    names = [m for m in ("ctrl", "shift", "alt", "win", "rctrl", "rshift", "altgr", "rwin") if mods & HID_MODS[m]]
+    label = "+".join(n.capitalize() if len(n) > 3 else n.upper() if n in ("alt", "win") else n.capitalize()
+                     for n in names + keys)
+    return mods, HID_KEYS[keys[0]], label
 
 ACTIONS = {  # name -> one-line description of what happens, shown under the focused action
     "Mod and flash controller": "check base firmware -> apply mods -> build image -> flash -> check controller",
@@ -143,12 +194,12 @@ def run(cmd: list[str], timeout: float = 10) -> str:
 # -- mods <-> mask ----------------------------------------------------------------------------------------------
 
 def levels_of(mask: int, features=None) -> list[int]:
-    """Mask -> chosen level per mod (highest level whose bits are all set)."""
+    """Mask -> chosen level per mod (highest level whose bits are all set; of levels with the same bits, the first)."""
     out = []
     for _title, _slider, levels in features or FEATURES:
         lvl = 0
         for i, level in enumerate(levels):
-            if level[0] and level[0] & mask == level[0]:
+            if level[0] and level[0] & mask == level[0] and level[0] != levels[lvl][0]:
                 lvl = i
         out.append(lvl)
     return out
@@ -161,9 +212,14 @@ def mask_of(levels: list[int], features=None) -> int:
     return m
 
 
-def mods_text(mask: int, features=None) -> list[str]:
+def mods_text(mask: int, features=None, shot_label: str | None = None) -> list[str]:
+    """Mod descriptions for a mask. The screenshot key itself isn't in the mask (nor stored on the controller):
+    pass shot_label to name it, else it reads 'a keyboard key'."""
     features = features or FEATURES
-    return [levels[lvl][1] for (_t, _s, levels), lvl in zip(features, levels_of(mask, features))]
+    out = [levels[lvl][1] for (_t, _s, levels), lvl in zip(features, levels_of(mask, features))]
+    if features is FEATURES and mask & SHOTKEY:
+        out[SHOT_FEATURE] = f"Screenshot button: {shot_label or 'a keyboard key'}"
+    return out
 
 
 def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
@@ -176,7 +232,9 @@ def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
         return None, f"GameSir stock {BASE} (or an early test build without a marker)"
     if b == MARKER_717:
         return PADDLES | RATE58 | RATE115, f"Modified firmware (GameSir {BASE} + mods)"
-    mask = b & 0x0F if b & 0xF0 == MARKER_BASE else b & 0x1F if b & 0xF0 == MARKER_BASE2 | 0x10 else 0
+    mask = (b & 0x0F if b & 0xF0 == MARKER_BASE else b & 0x1F if b & 0xF0 == MARKER_BASE2 | 0x10
+            else SHOTKEY | b & 0x1F if b & 0xE0 == MARKER_SHOT else SHOTBACK | b & 0x1F if b & 0xE0 == MARKER_BACK
+            else SHOTSHARE | b & 0x1F if b & 0xE0 == MARKER_SHARE else 0)
     if mask and mask == mask_of(levels_of(mask)):
         return mask, f"Modified firmware (GameSir {BASE} + mods)"
     return None, f"Unknown firmware (marker 0x{b:02x}, newer than this tool?)"
@@ -305,14 +363,37 @@ def latest_release() -> str:
 
 
 def marker_of(mask: int) -> int:
+    if mask & SHOTKEY:
+        return MARKER_SHOT | mask & 0x1F
+    if mask & SHOTBACK:
+        return MARKER_BACK | mask & 0x1F
+    if mask & SHOTSHARE:
+        return MARKER_SHARE | mask & 0x1F
     return (MARKER_BASE2 if mask & 0x10 else MARKER_BASE) | mask
 
 
-def build_bytes(stock_enc: bytes, mask: int, marker: int | None, step=lambda name: None) -> bytes:
-    """Stock 2.20 + edits for `mask` (+ marker byte unless None). Calls step('build') between the stages."""
+def build_bytes(stock_enc: bytes, mask: int, marker: int | None, step=lambda name: None,
+                shot: tuple[int, int] = (0, 0x68)) -> bytes:
+    """Stock 2.20 + edits for `mask` (+ marker byte unless None). Calls step('build') between the stages.
+    shot = (modifiers, HID key) for the screenshot-key mod (default F13)."""
     if not is_stock(stock_enc):
         raise ValueError("base is not the official 2.20")
     edits = mod_edits(mask)
+    if mask & SHOTKEY:
+        mods, key = shot
+        if not (0 <= mods <= 0xFF and 0x04 <= key <= 0xA4):
+            raise ValueError("screenshot key out of range")
+        slot = SHOT_TEMPLATE[:2] + bytes([mods, 0, key, 0])
+        fixed = []
+        for off, data in edits:
+            if SHOT_TEMPLATE in data:
+                if data.count(SHOT_TEMPLATE) != 1:
+                    raise ValueError("edits_kbshot.txt: key template not unique")
+                data = data.replace(SHOT_TEMPLATE, slot)
+            fixed.append((off, data))
+        if fixed == edits and slot != SHOT_TEMPLATE:
+            raise ValueError("edits_kbshot.txt: key template not found")
+        edits = fixed
     if marker is not None:
         edits = sorted(edits + [(MARKER_OFFSET, bytes([marker]))])
     plain = g8fw.crypt(stock_enc)
@@ -336,10 +417,17 @@ def selftest() -> int:
         same = build_bytes(stock, mask, marker) == (CR / ref).read_bytes()
         print(f"mods {mask:x} -> {ref}: {'identical' if same else 'DIFFERENT'}")
         ok &= same
-    for mask in sorted({mask_of([a, b, c]) for a in range(2) for b in range(3) for c in range(3)} - {0}):
+    for mask in sorted({mask_of([a, b, c, d]) for a in range(2) for b in range(3) for c in range(3)
+                        for d in (0, 1, 2, 3)} - {0}):
         valid, _desc, back = describe_image(build_bytes(stock, mask, marker_of(mask)))
         print(f"mods {mask:x}: valid {valid}, marker reads back as {back}")
         ok &= valid and back == mask
+    for combo, want in (("f13", "c2ff00006800"), ("PrtSc", "c2ff00004600"), ("ctrl+shift+f12", "c2ff03004500")):
+        mods, key, _label = parse_combo(combo)
+        plain = g8fw.crypt(build_bytes(stock, SHOTKEY, None, shot=(mods, key)))
+        got = plain[0x178D0:0x178D6].hex()
+        print(f"screenshot key {combo}: {got}")
+        ok &= got == want
     mfi_local = find_local_firmware(MFI) + [p for p in (TOOLS.parent / "mfi/downloads/8900/ota.bin",) if p.is_file()]
     if mfi_local:
         ok &= model_mfi.selftest(read_image(mfi_local[0]))
@@ -576,6 +664,7 @@ class App:
         self.greyed = False
         self.steps: Steps | None = None
         self.accepted = False    # flash disclaimer accepted in this session
+        self.shot_custom: tuple[int, int, str] | None = None  # (modifiers, HID key, label) for "custom key"
         self.scroll = 0          # first body line shown (the body scrolls so the focused row stays visible)
         self.body = False        # True while drawing the scrolling body
         self.focus_span = (0, 0)  # body lines of the focused row (+ its description)
@@ -730,6 +819,57 @@ class App:
                 return 1
             elif k in (ord("n"), ord("N")):
                 return None
+
+    def shot(self) -> tuple[int, int, str] | None:
+        """(modifiers, HID key, label) of the chosen screenshot key, or None (stock, or custom not set yet)."""
+        if self.m is not BT:
+            return None
+        lvl = self.choice[SHOT_FEATURE]
+        return SHOT_PRESETS.get(lvl) or (self.shot_custom if lvl == SHOT_CUSTOM else None)
+
+    def shot_label(self) -> str | None:
+        k = self.shot()
+        return k[2] if k else None
+
+    def ask_combo(self) -> bool:
+        """Ask for the custom screenshot key. Returns True if one is set."""
+        text, err = (self.shot_custom[2].lower() if self.shot_custom else ""), ""
+        while True:
+            self.draw()
+            h, w = self.scr.getmaxyx()
+            bw = max(min(w - 4, 76), 30)
+            lines = ["Type a key, optionally with modifiers, joined with +.",
+                     "Examples: f13   ctrl+shift+f12   alt+f9   printscreen   ctrl+alt+p",
+                     "Keys: a-z 0-9 f1-f24 printscreen insert home end pageup pagedown delete pause tab space ...",
+                     "Modifiers: ctrl shift alt win altgr (rctrl rshift rwin)", ""]
+            win = curses.newwin(len(lines) + 7, bw, max((h - len(lines) - 7) // 2, 0), max((w - bw) // 2, 0))
+            win.erase()
+            win.box()
+            try:
+                win.addnstr(0, 2, " Screenshot button: custom key ", bw - 4, curses.A_BOLD)
+                for i, line in enumerate(lines):
+                    win.addnstr(2 + i, 2, line, bw - 4, curses.A_DIM if i else 0)
+                win.addnstr(2 + len(lines), 2, f"> {text}_", bw - 4, curses.A_BOLD)
+                if err:
+                    win.addnstr(3 + len(lines), 2, err, bw - 4, self.red)
+                win.addnstr(len(lines) + 5, 2, "Enter = OK   Esc = cancel", bw - 4, self.cyan)
+            except curses.error:
+                pass
+            win.refresh()
+            k = self.scr.getch()
+            if k == 27:
+                return self.shot_custom is not None
+            if k in (10, 13, curses.KEY_ENTER):
+                try:
+                    self.shot_custom = parse_combo(text)
+                    self.say(f"screenshot key: {self.shot_custom[2]}")
+                    return True
+                except ValueError as exc:
+                    err = str(exc)
+            elif k in (curses.KEY_BACKSPACE, 127, 8):
+                text, err = text[:-1], ""
+            elif 32 <= k < 127 and len(text) < 40:
+                text, err = text + chr(k), ""
 
     def info(self, title: str, text: str) -> None:
         self.dialog(title, [(text, 0)], ["OK"])
@@ -945,6 +1085,8 @@ class App:
         for i, (_t, slider, levels) in enumerate(features):
             lvl = self.choice[i]
             _bits, desc, note, meter = levels[lvl]
+            if self.m is BT and i == SHOT_FEATURE and lvl == SHOT_CUSTOM:
+                desc = f"Screenshot button: custom key ({self.shot_custom[2] if self.shot_custom else 'not set'})"
             if lvl != cur[i]:
                 text, attr = f"* {desc}", curses.A_BOLD | self.yellow   # differs from the controller / stock
             elif lvl == 0:
@@ -967,6 +1109,8 @@ class App:
                     y = self.wrapped(y, 10, self.m.faster_note, self.yellow, 0)
             elif note:
                 y = self.wrapped(y, 10, note, curses.A_DIM, 0)
+            if self.m is BT and i == SHOT_FEATURE and levels[lvl][0] == SHOTKEY:
+                y = self.wrapped(y, 10, SHOT_NOTE, self.yellow, 0)
             if focused:
                 self.mark_focus(top, y - 1)
         mask = mask_of(self.choice, features)
@@ -1150,8 +1294,9 @@ class App:
                 steps.set(1, "done")
                 steps.set(2, "run")
         steps.set(1, "run")
+        extra = {"shot": self.shot()[:2]} if self.m is BT and mask & SHOTKEY else {}
         image = self.working(None, "Applying mods and building",
-                             lambda: self.m.build_bytes(base, mask, self.m.marker_of(mask), mark))
+                             lambda: self.m.build_bytes(base, mask, self.m.marker_of(mask), mark, **extra))
         steps.set(2, "done", f"{len(image)} bytes, checksums OK")
         return image
 
@@ -1302,7 +1447,7 @@ class App:
             steps.set(i + 1, "fail", f"controller reports: {c.firmware}"
                       + (f" with mods 0x{c.mask:x}" if c.mask is not None else ""))
             return False
-        steps.set(i + 1, "done", "controller reports: " + ("; ".join(mods_text(expect)) if expect is not None
+        steps.set(i + 1, "done", "controller reports: " + ("; ".join(mods_text(expect, shot_label=self.shot_label())) if expect is not None
                                                              else f"stock {BASE}"))
         return True
 
@@ -1324,7 +1469,7 @@ class App:
         if plan is None:
             return
         plan = list(plan)
-        names = [self.base_step_name(plan), "Apply mods: " + "; ".join(mods_text(mask)),
+        names = [self.base_step_name(plan), "Apply mods: " + "; ".join(mods_text(mask, shot_label=self.shot_label())),
                  "Build firmware image (checksums, encryption, self-check)", f"Flash to controller {c.label}",
                  "Check that the controller reports the new mods"]
         warn = []
@@ -1385,7 +1530,8 @@ class App:
         out_dir = Path.home() / "Downloads"
         out_dir = out_dir if out_dir.is_dir() else Path.cwd()
         out = out_dir / m.save_name(mask)
-        names = [self.base_step_name(plan), "Apply mods: " + "; ".join(mods_text(mask, m.features)),
+        names = [self.base_step_name(plan),
+                 "Apply mods: " + "; ".join(mods_text(mask, m.features, shot_label=self.shot_label())),
                  "Build firmware image (checksums, encryption, self-check)", f"Save as {out}"]
         warn = [] if mask in m.tested else ["This combination has not been tested on a controller yet."]
         if not m.marker_tested:
@@ -1504,7 +1650,14 @@ class App:
                 self.choice[idx] = (max(0, min(n - 1, self.choice[idx] + step)) if abs(step) == 1
                                     else (self.choice[idx] + 1) % n)
             else:
+                was = self.choice[idx]
+                shot_row = self.m is BT and idx == SHOT_FEATURE
+                if shot_row and step == 2 and was == SHOT_CUSTOM:
+                    self.ask_combo()  # Enter on "custom key" edits the key; Left/Right move on
+                    return
                 self.choice[idx] = (self.choice[idx] + (1 if step > 0 else -1)) % n
+                if shot_row and self.choice[idx] == SHOT_CUSTOM and self.shot_custom is None and not self.ask_combo():
+                    self.choice[idx] = was
 
     def check_updates(self) -> None:
         try:

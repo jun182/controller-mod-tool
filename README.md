@@ -33,6 +33,7 @@ type in the top row of the app. Terminal app for Linux, used with the arrow keys
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z (set both paddles to unmapped, "null", in the GameSir app first) | tested |
 | Input speed | Standard (~27 updates/s, stock) / Fast (~58/s) / Fastest (~115/s) | tested together with independent back buttons |
 | Stick smoothing | Stock (two filters: ~24 ms + ~8 ms lag on slow moves) / Light (first filter off) / Off (both off) | tested on one controller: no idle jitter measured, feels good in games |
+| Screenshot button | stock (phone screenshot: Volume Down + Power) / **Share** (seen natively as the Share button, e.g. by Nightjar; a Steam host can treat it as Quick Access) / Android Back / a keyboard key (Print Screen, F13 or any key combo you type) | Share and Back tested; keyboard key tested with F13 on a test build (2 bytes different from the current version) |
 
 Faster input speed makes the Bluetooth radio work more often, so it probably uses more battery (not measured yet).
 It can also disturb DS4 mode if your phone is paired with the controller in both modes. Combinations without the
@@ -49,7 +50,8 @@ what Linux already knows about the device; nothing is sent to the controller).
 |---|---|---|
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z (set both paddles to unmapped, "null", in the GameSir app first) | tested |
 | Home button | stock (held back ~0.8 s, Home + D-pad = volume) / remove Home button delay (Home + D-pad volume shortcut removed) | tested together with independent back buttons |
-| Stick smoothing | stock / stick averaging off (the first stick filter passes moves straight through, est. 1-3 ms faster; its tiny noise deadband and the second filter stay) | not tested on a controller yet |
+| Stick smoothing | stock / stick averaging off (the first stick filter passes moves straight through, est. 1-3 ms faster; its tiny noise deadband and the second filter stay) | tested (no idle jitter measured, fine in games) |
+| Screenshot button | stock (phone screenshot) / **Share** (seen natively as the Share button) / Android Back | tested |
 
 **File names:** `G8-Plus-MFi-firmware-99<number>.zip`, where the number is the sum of the chosen mods:
 
@@ -58,8 +60,10 @@ what Linux already knows about the device; nothing is sent to the controller).
 | Independent back buttons | 1 |
 | Remove Home button delay | 2 |
 | Stick averaging off | 4 |
+| Screenshot = Android Back | 8 |
+| Screenshot = Share | 16 |
 
-So 9901 = back buttons only, 9902 = Home delay fix only, 9903 = both, 9907 = all three. Starting at 9900 keeps the number above GameSir's
+So 9901 = back buttons only, 9903 = back buttons + Home delay fix, 9907 = + stick averaging off, 9923 = + Share (9915 = + Back instead). Starting at 9900 keeps the number above GameSir's
 own firmware (8900), so the phone app accepts the file as a newer version, and the name tells you what's inside.
 
 Files from this app also carry a one-byte build marker in the controller's descriptor, so the app can show which mods
@@ -79,6 +83,8 @@ warning). Updated with each release.
 | independent | Fastest | Stock | yes |
 | independent | Fastest | Light | yes |
 | independent | Fastest | Off | yes |
+| independent | Fastest | Off, screenshot = Share | yes |
+| independent | Fastest | Off, screenshot = Android Back | yes |
 
 **G8+ MFi** (firmware 8900)
 
@@ -86,7 +92,9 @@ warning). Updated with each release.
 |---|---|---|---|---|
 | independent | stock | stock | 9901 | yes |
 | independent | delay removed | stock | 9903 | yes |
-| independent | delay removed | averaging off | 9907 | measured (no idle jitter, clean stick moves); in-game test pending |
+| independent | delay removed | averaging off | 9907 | yes |
+| independent | delay removed | averaging off, screenshot = Android Back | 9915 | yes |
+| independent | delay removed | averaging off, screenshot = Share | 9923 | yes |
 
 ## What it does NOT include
 

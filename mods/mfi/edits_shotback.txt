@@ -1,0 +1,8 @@
+# MFi (fw 8900, Android/HID mode) screenshot button -> Android Back.
+# 1) Descriptor (area 0x30a67, same length): media bits were VolDown(0xEA), VolUp(0xE9), Power(0x30); bit 2 becomes
+#    AC Back (0x0224). The usages are written in long form and the redundant 'Logical Minimum 0' (15 00; already 0
+#    from the trigger items just before) is dropped, so the length stays 23 bytes. VolDown/VolUp (Home + D-pad
+#    shortcut on stock Home) are unchanged.
+30a67:050c09ea0ae9000a240275019503250181027501950581
+# 2) 0x1E1CC04 'r1 = r0 | 0x5' (VolDown + Power = phone screenshot, 200 ms pulse) -> '| 0x4' (bit 2 = AC Back only).
+1cc06:04

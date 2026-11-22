@@ -4,7 +4,7 @@ Build-only (user decision 2026-11-22): the app saves G8-Plus-MFi-firmware-<ver>.
 GameSir phone app ("local file"). Nothing here sends anything to the controller.
 
 Build marker: hat physical max in the Android-mode descriptor, area offset 0x30a36 (stock `46 3b 01`). Our builds
-write 0x20 | mask. 0x3b = stock 8900 or a build without a marker (e.g. our 9106/9107 test builds).
+write 0x20 | mask (0x40 | (mask & 0xF) when mask has bit 0x10). 0x3b = stock 8900 or a build without a marker (e.g. our 9106/9107 test builds).
 """
 
 import hashlib
@@ -28,13 +28,16 @@ CAN_FLASH = False
 MARKER_TESTED = True  # 9903 (mask 3, marker 0x23) flashed 2026-11-22: buttons OK on phone + Linux, marker read back over USB
 
 MARKER_OFFSET = 0x30a36
-MARKER_STOCK, MARKER_BASE = 0x3B, 0x20
+MARKER_STOCK, MARKER_BASE, MARKER_BASE2 = 0x3B, 0x20, 0x40  # 0x20|mask; masks with bit 0x10: 0x40|(mask & 0xF)
 HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)
 
-PADDLES, HOME, STICKAVG = 1, 2, 4
+PADDLES, HOME, STICKAVG, SHOTBACK, SHOTSHARE = 1, 2, 4, 8, 16
 MODS_DIRS = [TOOLS / "mods/mfi", TOOLS.parent / "mfi/v9106", TOOLS.parent / "mfi/v9107"]
-EDITS = {PADDLES: ["edits.txt"], HOME: ["edits_home.txt"], STICKAVG: ["edits_stick_avg.txt"]}  # the files the tested 9106 / 9107 were built from
-TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107, 9903 (marked, 2026-11-22)"}
+EDITS = {PADDLES: ["edits.txt"], HOME: ["edits_home.txt"], STICKAVG: ["edits_stick_avg.txt"],
+         SHOTBACK: ["edits_shotback.txt"], SHOTSHARE: ["edits_shotshare.txt"]}  # the files the tested 9106 / 9107 were built from
+TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107, 9903 (marked, 2026-11-22)",
+          PADDLES | HOME | STICKAVG | SHOTBACK: "9915 (2026-11-22)",
+          PADDLES | HOME | STICKAVG | SHOTSHARE: "9923 (2026-11-22)"}
 FEATURES = [
     ("Back buttons", False, [
         (0, "Stock back buttons", "copy a face button (programmable)", None),
@@ -51,6 +54,13 @@ FEATURES = [
         (STICKAVG, "Stick averaging off", "filter 1 passes stick (and trigger) moves straight through (est. 1-3 ms "
          "faster); its tiny noise deadband and the later filters stay", None),
     ]),
+    ("Screenshot button", False, [
+        (0, "Screenshot button: phone screenshot (stock)", "Volume Down + Power: Android takes a screenshot", None),
+        (SHOTBACK, "Screenshot button: Android Back", "the system Back key (like the back gesture); apps such as "
+         "Nightjar/Moonlight can bind it to their menu or exit. Replaces the Power key in the media report", None),
+        (SHOTSHARE, "Screenshot button: Share", "the media Record key, which Android calls MEDIA_RECORD: Nightjar shows "
+         "it as 'Share' and sends it to the PC as the controller's Share button", None),
+    ]),
 ]
 FASTER_NOTE = ""
 USB_VID = "3537"
@@ -64,7 +74,7 @@ def is_stock(enc: bytes) -> bool:
 
 
 def marker_of(mask: int) -> int:
-    return MARKER_BASE | mask
+    return (MARKER_BASE2 if mask & 0x10 else MARKER_BASE) | mask & 0x0F
 
 
 def all_masks() -> int:
@@ -75,6 +85,14 @@ def all_masks() -> int:
     return m
 
 
+def valid_masks() -> set[int]:
+    """Every mask the mod list can produce (one level per feature)."""
+    out = {0}
+    for _t, _s, levels in FEATURES:
+        out = {m | bits for m in out for bits, *_ in levels}
+    return out
+
+
 def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
     m = HAT_ITEM.search(report_map)
     if not m:
@@ -82,8 +100,9 @@ def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
     b = m.group(1)[0]
     if b == MARKER_STOCK:
         return None, f"GameSir stock {BASE}, or a mod build without a marker (e.g. 9106/9107)"
-    if b & 0xF0 == MARKER_BASE and b & 0x0F and not b & 0x0F & ~all_masks():
-        return b & 0x0F, f"Modified firmware (GameSir {BASE} + mods)"
+    mask = b & 0x0F if b & 0xF0 == MARKER_BASE else 0x10 | b & 0x0F if b & 0xF0 == MARKER_BASE2 else 0
+    if mask and mask in valid_masks():
+        return mask, f"Modified firmware (GameSir {BASE} + mods)"
     return None, f"Unknown firmware (marker 0x{b:02x}, newer than this tool?)"
 
 
@@ -180,7 +199,7 @@ def selftest(stock: bytes) -> bool:
         same = build_bytes(stock, mask, None) == (root / ref).read_bytes()
         print(f"MFi mods {mask:x} -> mfi/{ref}: {'identical' if same else 'DIFFERENT'}")
         ok &= same
-    for mask in range(1, all_masks() + 1):
+    for mask in sorted(valid_masks() - {0}):
         valid, _desc, back = describe_image(build_bytes(stock, mask, marker_of(mask)))
         print(f"MFi mods {mask:x}: valid {valid}, marker reads back as {back}")
         ok &= valid and back == mask

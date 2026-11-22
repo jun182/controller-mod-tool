@@ -1,0 +1,7 @@
+# Screenshot button -> 'Share' (HID Consumer Record 0xB2 -> Linux KEY_RECORD 167 -> Android MEDIA_RECORD; Nightjar
+# shows it as 'Share' and sends the host its Misc/Share button). Green (Android BLE) mode.
+# 1) Android-mode descriptor (file 0x2C0FB..): consumer usage Eject (0xB8, bit 5) -> Record (0xB2), same length.
+#    Eject was never sent (the only other consumer sender, 0x1E17394, pulses VolDown 1 / VolUp 16 only).
+2c177:b2
+# 2) Screenshot block: report byte 0 = 0x20 (bit 5) instead of 0x41 (VolDown + Power); byte 1 stays 0.
+178bc:4820   # was 50 21 'r0 = 65' -> 'r0 = 32'

@@ -1,0 +1,6 @@
+# Screenshot button -> Android Back (green/Android BLE mode). The stock screenshot block sends the 2-byte consumer
+# report (ID 2, handle 44) [0x41, 0x00] = Volume Down + Power (Android's screenshot combo). Bits of that report
+# (descriptor): 0 VolDown, 1 Play/Pause, 2 Prev, 3 Next, 4 VolUp, 5 Eject, 6 Power, 7 AC Home, 8 AC Back, 9 Menu.
+# This sends [0x00, 0x01] = AC Back instead (Linux KEY_BACK 158 -> Android BACK). Release still sends zeros.
+178bc:4020   # was 50 21 "r0 = 65"  -> "r0 = 0" (byte 0 of the report)
+178c0:4021   # was 40 20 "r0 = 0"   -> "r0 = 1" (stored as byte 1 by the bundle at 0x1E178C2)
