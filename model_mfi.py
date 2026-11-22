@@ -37,7 +37,8 @@ TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107, 9903 (marked, 2026
 FEATURES = [
     ("Back buttons", False, [
         (0, "Stock back buttons", "copy a face button (programmable)", None),
-        (PADDLES, "Independent back buttons", "L4 = BUTTON_C, R4 = BUTTON_Z (Android/HID mode)", None),
+        (PADDLES, "Independent back buttons", "L4 = BUTTON_C, R4 = BUTTON_Z (Android/HID mode); set both paddles to "
+         "unmapped (null) in the GameSir app, or they still copy a face button", None),
     ]),
     ("Home button", False, [
         (0, "Stock Home button", "Home is held back ~0.8 s; Home + D-pad = volume", None),

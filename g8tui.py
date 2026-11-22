@@ -90,7 +90,8 @@ FASTER_NOTE = ("Faster uses more battery (the Bluetooth radio wakes up more ofte
 FEATURES = [
     ("Back buttons", False, [
         (0, "Stock back buttons", "copy a face button (programmable)", None),
-        (PADDLES, "Independent back buttons", "L4 = BUTTON_C, R4 = BUTTON_Z", None),
+        (PADDLES, "Independent back buttons", "L4 = BUTTON_C, R4 = BUTTON_Z; set both paddles to unmapped (null) in "
+         "the GameSir app, or they still copy a face button", None),
     ]),
     ("Input speed", True, [
         (0, "Input speed: Standard (stock)", "~27 updates per second", 2),

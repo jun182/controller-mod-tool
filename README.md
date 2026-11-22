@@ -30,7 +30,7 @@ type in the top row of the app. Terminal app for Linux, used with the arrow keys
 
 | Mod | Options | Status |
 |---|---|---|
-| Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
+| Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z (set both paddles to unmapped, "null", in the GameSir app first) | tested |
 | Input speed | Standard (~27 updates/s, stock) / Fast (~58/s) / Fastest (~115/s) | tested together with independent back buttons |
 | Stick smoothing | Stock (two filters: ~24 ms + ~8 ms lag on slow moves) / Light (first filter off) / Off (both off) | tested on one controller: no idle jitter measured, feels good in games |
 
@@ -47,7 +47,7 @@ what Linux already knows about the device; nothing is sent to the controller).
 
 | Mod | Options | Status |
 |---|---|---|
-| Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
+| Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z (set both paddles to unmapped, "null", in the GameSir app first) | tested |
 | Home button | stock (held back ~0.8 s, Home + D-pad = volume) / remove Home button delay (Home + D-pad volume shortcut removed) | tested together with independent back buttons |
 | Stick smoothing | stock / stick averaging off (the first stick filter passes moves straight through, est. 1-3 ms faster; its tiny noise deadband and the second filter stay) | not tested on a controller yet |
 
