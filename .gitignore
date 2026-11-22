@@ -1,0 +1,7 @@
+# Firmware is proprietary: never commit it
+firmware/
+*.zip
+*.bin
+# Personal controller names
+known_controllers.json
+__pycache__/
