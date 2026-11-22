@@ -90,4 +90,9 @@ Inspired by enij90's firmware patches for the Lenovo Legion G9 controller (https
 
 ## Licence
 
-Not decided yet. Until a licence file is added, no licence is granted.
+[MIT](LICENSE) for this project's own code and edit files. It covers nothing of GameSir's: their firmware stays
+theirs, is not included here, and is downloaded by you from their own server.
+
+This is an independent hobby project made for interoperability (letting the back buttons and sticks work as their
+own inputs on Android and Linux). It is not affiliated with, endorsed by or supported by GameSir. If you represent
+GameSir and have a concern, please open an issue and we will respond.
