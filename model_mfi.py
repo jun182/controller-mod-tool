@@ -41,7 +41,7 @@ FEATURES = [
     ]),
     ("Home button", False, [
         (0, "Stock Home button", "Home is held back ~0.8 s; Home + D-pad = volume", None),
-        (HOME, "Instant Home button", "Home is sent at once; the Home + D-pad volume shortcut is removed", None),
+        (HOME, "Remove Home button delay", "Home is sent at once; the Home + D-pad volume shortcut is removed", None),
     ]),
 ]
 FASTER_NOTE = ""

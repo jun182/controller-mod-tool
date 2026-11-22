@@ -48,7 +48,7 @@ what Linux already knows about the device; nothing is sent to the controller).
 | Mod | Options | Status |
 |---|---|---|
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
-| Home button | stock (held back ~0.8 s, Home + D-pad = volume) / instant (volume shortcut removed) | tested together with independent back buttons |
+| Home button | stock (held back ~0.8 s, Home + D-pad = volume) / remove Home button delay (Home + D-pad volume shortcut removed) | tested together with independent back buttons |
 
 Files from this app also carry a one-byte build marker in the controller's descriptor (the same idea already works on
 the Bluetooth model). No marked MFi build has run on a controller yet: check the buttons after flashing.
