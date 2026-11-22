@@ -24,7 +24,7 @@ STOCK_NAME = "G8-Plus-MFi-firmware-8900.zip"
 STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME
 IMAGE_SIZE = mfifw.IMAGE_SIZE
 CAN_FLASH = False
-MARKER_TESTED = False  # no marked MFi build has run on a controller yet (the BT marker works; same idea here)
+MARKER_TESTED = True  # 9903 (mask 3, marker 0x23) flashed 2026-11-22: buttons OK on phone + Linux, marker read back over USB
 
 MARKER_OFFSET = 0x30a36
 MARKER_STOCK, MARKER_BASE = 0x3B, 0x20
@@ -33,7 +33,7 @@ HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)
 PADDLES, HOME = 1, 2
 MODS_DIRS = [TOOLS / "mods/mfi", TOOLS.parent / "mfi/v9106", TOOLS.parent / "mfi/v9107"]
 EDITS = {PADDLES: ["edits.txt"], HOME: ["edits_home.txt"]}  # the files the tested 9106 / 9107 were built from
-TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107"}
+TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107, 9903 (marked, 2026-11-22)"}
 FEATURES = [
     ("Back buttons", False, [
         (0, "Stock back buttons", "copy a face button (programmable)", None),

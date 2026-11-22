@@ -60,8 +60,8 @@ what Linux already knows about the device; nothing is sent to the controller).
 So 9901 = back buttons only, 9902 = Home delay fix only, 9903 = both. Starting at 9900 keeps the number above GameSir's
 own firmware (8900), so the phone app accepts the file as a newer version, and the name tells you what's inside.
 
-Files from this app also carry a one-byte build marker in the controller's descriptor (the same idea already works on
-the Bluetooth model). No marked MFi build has run on a controller yet: check the buttons after flashing.
+Files from this app also carry a one-byte build marker in the controller's descriptor, so the app can show which mods
+are installed (tested: 9903 on a G8+ MFi, Android phone and Linux).
 
 ## What it does NOT include
 
