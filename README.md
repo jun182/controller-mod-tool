@@ -50,7 +50,7 @@ what Linux already knows about the device; nothing is sent to the controller).
 |---|---|---|
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z (set both paddles to unmapped, "null", in the GameSir app first) | tested |
 | Home button | stock (held back ~0.8 s, Home + D-pad = volume) / remove Home button delay (Home + D-pad volume shortcut removed) | tested together with independent back buttons |
-| Stick smoothing | stock / stick averaging off (the first stick filter passes moves straight through, est. 1-3 ms faster; its tiny noise deadband and the second filter stay) | tested (no idle jitter measured, fine in games) |
+| Stick smoothing | Stock / Light (first filter's averaging off, est. 1-3 ms faster) / Off (also the second filter, "anti_shake", which GameSir's app has no switch for; est. ~3 ms more) | tested (no idle jitter measured, fine in games) |
 | Screenshot button | stock (phone screenshot) / **Share** (seen natively as the Share button) / Android Back | tested |
 
 **File names:** `G8-Plus-MFi-firmware-99<number>.zip`, where the number is the sum of the chosen mods:
@@ -62,8 +62,9 @@ what Linux already knows about the device; nothing is sent to the controller).
 | Stick averaging off | 4 |
 | Screenshot = Android Back | 8 |
 | Screenshot = Share | 16 |
+| Stick smoothing Off (adds to 4) | 32 |
 
-So 9901 = back buttons only, 9903 = back buttons + Home delay fix, 9907 = + stick averaging off, 9923 = + Share (9915 = + Back instead). Starting at 9900 keeps the number above GameSir's
+So 9901 = back buttons only, 9903 = back buttons + Home delay fix, 9907 = + stick averaging off, 9923 = + Share (9915 = + Back instead), 9955 = 9923 with stick smoothing Off. Starting at 9900 keeps the number above GameSir's
 own firmware (8900), so the phone app accepts the file as a newer version, and the name tells you what's inside.
 
 Files from this app also carry a one-byte build marker in the controller's descriptor, so the app can show which mods
@@ -95,6 +96,7 @@ warning). Updated with each release.
 | independent | delay removed | averaging off | 9907 | yes |
 | independent | delay removed | averaging off, screenshot = Android Back | 9915 | yes |
 | independent | delay removed | averaging off, screenshot = Share | 9923 | yes |
+| independent | delay removed | smoothing Off, screenshot = Share | 9955 | yes |
 
 ## What it does NOT include
 

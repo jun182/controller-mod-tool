@@ -1,0 +1,6 @@
+# MFi (fw 8900) stick filter 2 'anti_shake' off: a 0.5 float EMA in 0x1E19B12 (stick processing, called per stick from
+# the main loop 0x1E223B6 / 0x1E223C2). It runs only if the per-stick config flag b[0x5BC0+98+stick] != 0 (set from the
+# stored config at 0x1E17D50; GameSir's phone app has no switch for it, and the config write path can't be used: see
+# BACKLOG 16). Patch: the flag load at 0x1E19B24 becomes 'r0 = 0', so 0x1E19B28 always takes the firmware's own
+# anti_shake-off path (0x1E19B62: raw values, rejoins at 0x1E19C0E). The flag has no other reader.
+19b24:40200000   # was 50 ee 02 06 'r0 = b[r0+98] (u)' -> 40 20 'r0 = 0', 00 00 nop
