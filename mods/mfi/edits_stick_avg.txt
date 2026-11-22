@@ -1,0 +1,6 @@
+# MFi (fw 8900) stick filter 1: drop the 50/50 averaging, keep the 3-step deadband (10-bit scale).
+# 0x1E1901A..0x1E1903A loops over 6 inputs (h[0x5BC0+1240+{12,14,20,0,2,6}] >> 2):
+#   if (|prev - new| >= 3) prev = (new + prev) >> 1      (prev = h[0x5BC0+1126 + 2*i])
+# Patched: if (|prev - new| >= 3) prev = new. Outputs 1-4 = sticks (main loop 0x1E22390), 0 and 5 = triggers (getter
+# 0x1E192D2, idx 563/568; trigger code 0x1E19D4A averages again). Reviews: docs/reviews/2026-11-22-*-mfi-stick-avg.md
+19030:00000000   # was 53 18 "r3 += r5", b3 a1 "r3 = r3 >> 1" -> 2 nops; the store at 0x1E19034 then writes the new value

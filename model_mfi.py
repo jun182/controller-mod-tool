@@ -30,9 +30,9 @@ MARKER_OFFSET = 0x30a36
 MARKER_STOCK, MARKER_BASE = 0x3B, 0x20
 HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)
 
-PADDLES, HOME = 1, 2
+PADDLES, HOME, STICKAVG = 1, 2, 4
 MODS_DIRS = [TOOLS / "mods/mfi", TOOLS.parent / "mfi/v9106", TOOLS.parent / "mfi/v9107"]
-EDITS = {PADDLES: ["edits.txt"], HOME: ["edits_home.txt"]}  # the files the tested 9106 / 9107 were built from
+EDITS = {PADDLES: ["edits.txt"], HOME: ["edits_home.txt"], STICKAVG: ["edits_stick_avg.txt"]}  # the files the tested 9106 / 9107 were built from
 TESTED = {0: "stock", PADDLES: "9106", PADDLES | HOME: "9107, 9903 (marked, 2026-11-22)"}
 FEATURES = [
     ("Back buttons", False, [
@@ -42,6 +42,12 @@ FEATURES = [
     ("Home button", False, [
         (0, "Stock Home button", "Home is held back ~0.8 s; Home + D-pad = volume", None),
         (HOME, "Remove Home button delay", "Home is sent at once; the Home + D-pad volume shortcut is removed", None),
+    ]),
+    ("Stick smoothing", False, [
+        (0, "Stock stick smoothing", "filter 1 averages each stick move with the previous value (est. 1-3 ms lag)",
+         None),
+        (STICKAVG, "Stick averaging off", "filter 1 passes stick (and trigger) moves straight through (est. 1-3 ms "
+         "faster); its tiny noise deadband and the later filters stay", None),
     ]),
 ]
 FASTER_NOTE = ""

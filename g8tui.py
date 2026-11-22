@@ -58,7 +58,7 @@ STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3du
 REPO_STOCK_ZIP = CR / "v7.17/g8-bluetooth-firmware-2.22.zip"  # our saved copy (= official 2.20); self-test only
 # App version, Semantic Versioning (semver.org). 0.y.z = beta: anything may still change. Bump MINOR for new mods or
 # features, PATCH for fixes; 1.0.0 = first release we call stable. Git tag each release as v<version>.
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 AUTHOR = "jun182"
 REPO = "jun182/controller-mod-tool"  # GitHub; releases are tagged v<VERSION>
 
