@@ -26,6 +26,7 @@ Version:   python3 g8tui.py --version
 Self-test: python3 g8tui.py --selftest   (builds every mod combination and reads its marker back; no network)
 """
 
+import base64
 import curses
 import hashlib
 import io
@@ -54,7 +55,9 @@ CACHE = Path.home() / ".cache/g8tui"     # built images (temporary)
 FW_DIR = TOOLS / "firmware"               # where GameSir firmware files go (git-ignored)
 BASE = "2.20"
 STOCK_NAME = "g8-bluetooth-firmware-2.20.zip"
-STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME
+# GameSir's own update server (base64, so the address isn't plain text in the source; nothing secret about it).
+FW_SERVER = base64.b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode()
+STOCK_URL = FW_SERVER + STOCK_NAME
 REPO_STOCK_ZIP = CR / "v7.17/g8-bluetooth-firmware-2.22.zip"  # our saved copy (= official 2.20); self-test only
 # App version, Semantic Versioning (semver.org). 0.y.z = beta: anything may still change. Bump MINOR for new mods or
 # features, PATCH for fixes; 1.0.0 = first release we call stable. Git tag each release as v<version>.

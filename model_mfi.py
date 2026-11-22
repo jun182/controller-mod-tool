@@ -7,6 +7,7 @@ Build marker: hat physical max in the Android-mode descriptor, area offset 0x30a
 write 0x20 | mask (0x40 | (mask & 0xF) when mask has bit 0x10; 0x80 | mask when it has bit 0x20). 0x3b = stock 8900 or a build without a marker (e.g. our 9106/9107 test builds).
 """
 
+import base64
 import hashlib
 import re
 import sys
@@ -22,7 +23,8 @@ BLURB = ("USB cable only. The app builds a firmware file; you flash it with the 
          "second; that is normal).")
 BASE = "8900"
 STOCK_NAME = "G8-Plus-MFi-firmware-8900.zip"
-STOCK_URL = __import__("base64").b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME
+# GameSir's update server, base64 (same as in g8tui.py: not plain text in the source; nothing secret about it).
+STOCK_URL = base64.b64decode("aHR0cHM6Ly9vdGEueGlhb2ppLmNvbS9kb3dubG9hZC8=").decode() + STOCK_NAME
 IMAGE_SIZE = mfifw.IMAGE_SIZE
 CAN_FLASH = False
 MARKER_TESTED = True  # 9903 (mask 3, marker 0x23) flashed 2026-11-22: buttons OK on phone + Linux, marker read back over USB
