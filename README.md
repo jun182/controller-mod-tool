@@ -50,6 +50,16 @@ what Linux already knows about the device; nothing is sent to the controller).
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
 | Home button | stock (held back ~0.8 s, Home + D-pad = volume) / remove Home button delay (Home + D-pad volume shortcut removed) | tested together with independent back buttons |
 
+**File names:** `G8-Plus-MFi-firmware-99<number>.zip`, where the number is the sum of the chosen mods:
+
+| Mod | Number |
+|---|---|
+| Independent back buttons | 1 |
+| Remove Home button delay | 2 |
+
+So 9901 = back buttons only, 9902 = Home delay fix only, 9903 = both. Starting at 9900 keeps the number above GameSir's
+own firmware (8900), so the phone app accepts the file as a newer version, and the name tells you what's inside.
+
 Files from this app also carry a one-byte build marker in the controller's descriptor (the same idea already works on
 the Bluetooth model). No marked MFi build has run on a controller yet: check the buttons after flashing.
 
