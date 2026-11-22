@@ -124,11 +124,22 @@ menu asks GitHub for the newest release and tells you; it never downloads or ins
 - The controller in **Android mode** (A + Home, green light). Turn your phone's Bluetooth off while flashing: if the
   controller is connected to the phone, the laptop can't see it.
 
-## Use
+## Download and run
+
+There is nothing to install or build: the app is a Python script.
+
+1. Download it: on the [latest release](https://github.com/jun182/controller-mod-tool/releases/latest) click
+   **Source code (zip)** and unzip it, or `git clone https://github.com/jun182/controller-mod-tool`.
+2. Open a terminal in that folder and start it:
 
 ```
 python3 g8tui.py
 ```
+
+The first time you build a firmware, the app offers to download GameSir's official firmware for you (or put the file
+in a `firmware/` folder next to `g8tui.py` yourself).
+
+## Use
 
 Up/Down move, Left/Right or Enter change a mod, Enter runs an action, Esc goes back / quits. Before flashing:
 charge the controller, plug the laptop in, keep both close together, and don't touch the controller until the
