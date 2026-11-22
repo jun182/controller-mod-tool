@@ -1,0 +1,5 @@
+# Stick smoothing off (G8+ BT 2.20). Stick filter 0x1E02812 (all 4 stick axes, every 8 ms tick): a raw change < 81 per
+# tick goes through y = (3y + raw) / 4 once the bypass counter b[0x6C4E + stick] is 0. 0x1E0288A "if (r4 == 0) goto
+# 0x1E0291C" (the jump into that filter) -> NOP: always take the raw path that big moves already use. The counter then
+# just wraps (only this function uses it). Triggers have their own filter and are not affected.
+288a:0000

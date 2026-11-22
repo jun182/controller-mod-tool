@@ -31,6 +31,7 @@ version)**, firmware 2.20. Terminal app for Linux, used with the arrow keys, Ent
 |---|---|---|
 | Back buttons | stock (copy a face button) / independent: L4 = BUTTON_C, R4 = BUTTON_Z | tested |
 | Input speed | Standard (~27 updates/s, stock) / Fast (~58/s) / Fastest (~115/s) | tested together with independent back buttons |
+| Stick smoothing | on (stock: slow stick moves lag ~24 ms) / off (sticks respond at once, tiny jitter near the centre) | experimental: measured on one controller |
 
 Faster input speed makes the Bluetooth radio work more often, so it probably uses more battery (not measured yet).
 It can also disturb DS4 mode if your phone is paired with the controller in both modes. Combinations without the

@@ -15,7 +15,8 @@ What it does, step by step and visibly:
 We never ship GameSir's firmware: only this script and our edit files.
 
 Build marker: Report Map byte at file 0x2C124 (hat physical max, stock `46 3b 01`). Our builds write
-0x20 | mask (mask bits below); 0x3a = 7.17 (mask 7, older marker); 0x3b = stock or an unmarked test build.
+0x20 | mask (4 mask bits below, 0x21-0x2f); 0x3a = 7.17 (mask 7, older marker); 0x3b = stock or an unmarked test
+build.
 
 Run:       python3 g8tui.py
 Self-test: python3 g8tui.py --selftest   (builds every mod combination and reads its marker back; no network)
@@ -54,13 +55,14 @@ MARKER_STOCK, MARKER_717, MARKER_BASE = 0x3B, 0x3A, 0x20
 IMAGE_SIZE = 393908            # every G8+ BT image built on 2.20 (stock and ours) has exactly this size
 HAT_ITEM = re.compile(rb"\x35\x00\x46(.)\x01\x65\x14", re.S)  # hat: phys min 0, phys max 0x01xx, unit (Report Map)
 
-PADDLES, RATE58, RATE115 = 1, 2, 4
-MODS_DIRS = [TOOLS / "mods", CR / "v7.17"]  # public layout: mods/ next to the app; private repo: claude-re/v7.17
+PADDLES, RATE58, RATE115, STICKRAW = 1, 2, 4, 8
+MODS_DIRS = [TOOLS / "mods", CR / "v7.17"]  # (tools/mods also exists in the private repo, for newer mods)  # public layout: mods/ next to the app; private repo: claude-re/v7.17
 MAX_FILE = 4_000_000  # bytes; firmware files are ~0.4 MB, anything much bigger is not one
 EDITS = {  # mask bit -> edit files (offset:hex lines), the same files the tested builds were made from
     PADDLES: ["edits_7.1_paddles.txt"],
     RATE58: ["edits_interval.txt", "edits_accept.txt"],
     RATE115: ["edits_gate2.txt"],
+    STICKRAW: ["edits_stick_raw.txt"],
 }
 # Masks whose code is byte-identical to a build tested on hardware (only the marker byte differs).
 TESTED = {0: "stock", PADDLES: "7.1", PADDLES | RATE58: "7.13/7.15", PADDLES | RATE58 | RATE115: "7.17"}
@@ -79,6 +81,11 @@ FEATURES = [
         (0, "Input speed: Standard (stock)", "~27 updates per second", 2),
         (RATE58, "Input speed: Fast", "~58 updates per second", 5),
         (RATE58 | RATE115, "Input speed: Fastest", "~115 updates per second", 10),
+    ]),
+    ("Stick smoothing", False, [
+        (0, "Stick smoothing on (stock)", "slow stick moves lag ~24 ms behind; hides stick jitter", None),
+        (STICKRAW, "Stick smoothing off", "sticks respond at once; may jitter a little near the centre (experimental)",
+         None),
     ]),
 ]
 
@@ -145,8 +152,8 @@ def mask_from_report_map(report_map: bytes) -> tuple[int | None, str]:
         return None, f"GameSir stock {BASE} (or an early test build without a marker)"
     if b == MARKER_717:
         return PADDLES | RATE58 | RATE115, f"Modified firmware (GameSir {BASE} + mods)"
-    mask = b & 0x07
-    if b & 0xF8 == MARKER_BASE and mask and mask == mask_of(levels_of(mask)):
+    mask = b & 0x0F
+    if b & 0xF0 == MARKER_BASE and mask and mask == mask_of(levels_of(mask)):
         return mask, f"Modified firmware (GameSir {BASE} + mods)"
     return None, f"Unknown firmware (marker 0x{b:02x}, newer than this tool?)"
 
@@ -280,7 +287,7 @@ def selftest() -> int:
         same = build_bytes(stock, mask, marker) == (CR / ref).read_bytes()
         print(f"mods {mask:x} -> {ref}: {'identical' if same else 'DIFFERENT'}")
         ok &= same
-    for mask in sorted({mask_of([a, b]) for a in range(2) for b in range(3)} - {0}):
+    for mask in sorted({mask_of([a, b, c]) for a in range(2) for b in range(3) for c in range(2)} - {0}):
         valid, _desc, back = describe_image(build_bytes(stock, mask, MARKER_BASE | mask))
         print(f"mods {mask:x}: valid {valid}, marker reads back as {back}")
         ok &= valid and back == mask
