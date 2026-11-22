@@ -65,6 +65,29 @@ own firmware (8900), so the phone app accepts the file as a newer version, and t
 Files from this app also carry a one-byte build marker in the controller's descriptor, so the app can show which mods
 are installed (tested: 9903 on a G8+ MFi, Android phone and Linux).
 
+### Tested combinations
+
+Combinations tested on a real controller (the app also marks these as "Tested combination"; anything else gets a
+warning). Updated with each release.
+
+**G8+ Bluetooth** (firmware 2.20)
+
+| Back buttons | Input speed | Stick smoothing | Tested |
+|---|---|---|---|
+| independent | Standard | Stock | yes |
+| independent | Fast | Stock | yes |
+| independent | Fastest | Stock | yes |
+| independent | Fastest | Light | yes |
+| independent | Fastest | Off | yes |
+
+**G8+ MFi** (firmware 8900)
+
+| Back buttons | Home button | Stick smoothing | File | Tested |
+|---|---|---|---|---|
+| independent | stock | stock | 9901 | yes |
+| independent | delay removed | stock | 9903 | yes |
+| independent | delay removed | averaging off | 9907 | measured (no idle jitter, clean stick moves); in-game test pending |
+
 ## What it does NOT include
 
 **No GameSir firmware is included or distributed here**, only our own code and small edit files (lists of
