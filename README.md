@@ -155,7 +155,7 @@ app says Done (about 2 minutes).
 - **G8+ MFi** (flashed with the GameSir phone app over the cable): **under a second**. That is normal, not a failed
   update: the controller restarts with the new firmware straight away.
 
-Optional: name your own controllers in `known_controllers.json` next to the script, for example
+Optional: you can name your own controllers in `known_controllers.json` next to the script, for example
 `{"A0:5A:59:12:34:56": "spare"}`. If you name one "spare" or "test", the app warns before flashing any other.
 
 ## If something goes wrong
