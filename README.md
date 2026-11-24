@@ -4,6 +4,10 @@ Unofficial tool to add mods to game controller firmware. Supported controllers: 
 version)**, firmware 2.20, and **GameSir G8+ MFi (wired)**, firmware 8900 (build-only, see below). Pick the controller
 type in the top row of the app. Terminal app for Linux, used with the arrow keys, Enter and Esc.
 
+Other GameSir models (for example the X4) and other brands are **not supported**: the edit files only match the
+firmware images listed above, and the app refuses any other file. Windows and macOS are not supported either: the app
+uses Python's `curses` module and BlueZ's `bluetoothctl`, which are Linux-only here.
+
 > [!CAUTION]
 > **USE AT YOUR OWN RISK. NO WARRANTY. I AM MOST DEFINITELY NOT RESPONSIBLE FOR ANY DAMAGE.**
 >
